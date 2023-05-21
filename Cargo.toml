@@ -1,5 +1,5 @@
 [package]
-name = "zkwasm-rlp"
+name = "zkwasm-rust-sdk"
 version = "0.1.0"
 edition = "2021"
 

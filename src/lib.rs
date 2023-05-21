@@ -67,7 +67,7 @@ impl Merkle {
 
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
-pub fn test() -> i64 {
+pub fn zkmain() -> i64 {
     let _data = vec![0x83, b'c', b'a', b't'];
     0
 }
