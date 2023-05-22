@@ -15,7 +15,19 @@ pub struct Merkle {
 }
 
 impl Merkle {
-    pub fn init(root: [u64; 4]) -> Self {
+    pub fn load(root: [u64; 4]) -> Self {
+        unsafe {
+            kvpair_setroot(root[0]);
+            kvpair_setroot(root[1]);
+            kvpair_setroot(root[2]);
+            kvpair_setroot(root[3]);
+        }
+        Merkle { root }
+    }
+
+    pub fn new() -> Self {
+        //TODO: fix the hardcoded height 20 merkle root
+        let root = [4074723173704310182, 3116368985344895753, 15689180094961269493, 694055158784170088];
         unsafe {
             kvpair_setroot(root[0]);
             kvpair_setroot(root[1]);
