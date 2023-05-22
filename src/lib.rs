@@ -37,7 +37,8 @@ impl Merkle {
         Merkle { root }
     }
 
-    pub fn get(index: u64, data: &mut [u64; 4]) {
+    pub fn get(index: u64) -> [u64; 4] {
+        let mut data = [0; 4];
         unsafe {
             kvpair_address(index);
             data[0] = kvpair_get();
@@ -45,15 +46,18 @@ impl Merkle {
             data[2] = kvpair_get();
             data[3] = kvpair_get();
         }
+        data
     }
 
-    pub fn getroot(data: &mut [u64; 4]) {
+    pub fn getroot() -> [u64; 4] {
+        let mut data = [0; 4];
         unsafe {
             data[0] = kvpair_getroot();
             data[1] = kvpair_getroot();
             data[2] = kvpair_getroot();
             data[3] = kvpair_getroot();
         }
+        data
     }
 
     pub fn set(index: u64, data: &[u64; 4]) {
