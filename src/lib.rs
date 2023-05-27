@@ -13,7 +13,7 @@ extern "C" {
 pub struct Merkle {}
 
 impl Merkle {
-    pub fn load(root: [u64; 4]) {
+    pub fn load(root: &[u64; 4]) {
         unsafe {
             kvpair_setroot(root[0]);
             kvpair_setroot(root[1]);
