@@ -1,7 +1,7 @@
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
     pub fn require(cond:i32);
-    pub fn log(v:u64);
+    pub fn wasm_dbg(v:u64);
 
     fn kvpair_setroot(x:u64);
     fn kvpair_address(x:u64);
