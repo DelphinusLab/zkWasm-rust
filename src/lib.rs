@@ -8,6 +8,9 @@ extern "C" {
     fn kvpair_set(x:u64);
     fn kvpair_get() -> u64;
     fn kvpair_getroot() -> u64;
+    fn poseidon_new(x:u64);
+    fn poseidon_push(x:u64);
+    fn poseidon_finalize() -> u64;
 }
 
 pub struct Merkle {}
@@ -76,13 +79,102 @@ impl Merkle {
     }
 }
 
+pub struct PoseidonHasher (u64);
+
+impl PoseidonHasher {
+    pub fn new() -> Self {
+        unsafe {
+            poseidon_new(1u64);
+        }
+        PoseidonHasher(0u64)
+    }
+    pub fn update(&mut self, v:u64) {
+        unsafe {
+            poseidon_push(v);
+        }
+        self.0 += 1;
+        if self.0 == 32 {
+            unsafe {
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_new(0u64);
+            }
+            self.0 = 0;
+        }
+    }
+    pub fn finalize(&mut self) -> [u64; 4] {
+        for _ in (self.0 & 0x3) .. 4 {
+            unsafe {
+                poseidon_push(0);
+            }
+            self.0 += 1;
+        }
+        if self.0 == 32 {
+            unsafe {
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_new(0u64);
+            }
+            self.0 = 0;
+        }
+        unsafe {
+            poseidon_push(1);
+        }
+        self.0 += 1;
+        for _ in self.0 .. 32 {
+            unsafe {
+                poseidon_push(0);
+            }
+        }
+        unsafe {
+            [
+                poseidon_finalize(),
+                poseidon_finalize(),
+                poseidon_finalize(),
+                poseidon_finalize(),
+            ]
+        }
+    }
+}
+
 
 #[cfg(feature = "test")]
+
+
 mod test {
+    extern "C" {
+        pub fn wasm_input(is_public: u32) -> u64;
+        pub fn require(cond:bool);
+        pub fn wasm_dbg(v:u64);
+
+        fn kvpair_setroot(x:u64);
+        fn kvpair_address(x:u64);
+        fn kvpair_set(x:u64);
+        fn kvpair_get() -> u64;
+        fn kvpair_getroot() -> u64;
+        fn poseidon_new(x:u64);
+        fn poseidon_push(x:u64);
+        fn poseidon_finalize() -> u64;
+    }
+
+
     use wasm_bindgen::prelude::*;
+    use super::PoseidonHasher;
     #[wasm_bindgen]
     pub fn zkmain() -> i64 {
-        let _data = vec![0x83, b'c', b'a', b't'];
+        let mut hasher = PoseidonHasher::new();
+        let data = vec![0x1, 0, 0];
+        for d in data {
+            hasher.update(d);
+        }
+        let z = hasher.finalize();
+        unsafe {
+            require(z[0] == 1);
+        }
         0
     }
 }
