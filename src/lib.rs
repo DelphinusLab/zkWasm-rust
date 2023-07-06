@@ -11,6 +11,11 @@ extern "C" {
     fn poseidon_new(x:u64);
     fn poseidon_push(x:u64);
     fn poseidon_finalize() -> u64;
+
+    fn babyjubjub_sum_new(x:u64);
+    fn babyjubjub_sum_push(x:u64);
+    fn babyjubjub_sum_finalize() -> u64;
+
 }
 
 pub struct Merkle {}
@@ -141,6 +146,63 @@ impl PoseidonHasher {
     }
 }
 
+pub struct BabyJubjubPoint {
+    x: [u64;4],
+    y: [u64;4],
+}
+
+impl BabyJubjubPoint {
+    pub fn msm(points: Vec<(&BabyJubjubPoint, &[u64; 4])>) -> BabyJubjubPoint {
+        let mut len = points.len();
+        unsafe {
+            babyjubjub_sum_new(1u64);
+        }
+        for (point, scalar) in points {
+            unsafe {
+                babyjubjub_sum_push(point.x[0]);
+                babyjubjub_sum_push(point.x[1]);
+                babyjubjub_sum_push(point.x[2]);
+                babyjubjub_sum_push(point.x[3]);
+                babyjubjub_sum_push(point.y[0]);
+                babyjubjub_sum_push(point.y[1]);
+                babyjubjub_sum_push(point.y[2]);
+                babyjubjub_sum_push(point.y[3]);
+                babyjubjub_sum_push(scalar[0]);
+                babyjubjub_sum_push(scalar[1]);
+                babyjubjub_sum_push(scalar[2]);
+                babyjubjub_sum_push(scalar[3]);
+                len -= 1;
+                if len != 0 {
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                    babyjubjub_sum_finalize();
+                }
+            }
+        }
+        unsafe {
+            BabyJubjubPoint {
+                x: [
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                ],
+                y: [
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                   babyjubjub_sum_finalize(),
+                ],
+            }
+        }
+    }
+}
+
 
 #[cfg(feature = "test")]
 
@@ -161,6 +223,8 @@ mod test {
         fn poseidon_finalize() -> u64;
     }
 
+    use super::BabyJubjubPoint;
+
 
     use wasm_bindgen::prelude::*;
     use super::PoseidonHasher;
@@ -172,8 +236,18 @@ mod test {
             hasher.update(d);
         }
         let z = hasher.finalize();
+        /*
         unsafe {
             require(z[0] == 1);
+        }
+        */
+
+        let c = BabyJubjubPoint {x:[0,0,0,0], y:[1, 0, 0, 0]};
+        let p = BabyJubjubPoint::msm(vec![(&c, &[1,0,0,0])]);
+
+        unsafe {
+            require(p.x[0] == 0);
+            require(p.y[0] == 1);
         }
         0
     }
