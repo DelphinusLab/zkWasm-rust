@@ -181,6 +181,7 @@ impl BabyJubjubPoint {
                     babyjubjub_sum_finalize();
                     babyjubjub_sum_finalize();
                     babyjubjub_sum_finalize();
+                    babyjubjub_sum_new(0u64);
                 }
             }
         }
@@ -248,6 +249,46 @@ mod test {
         unsafe {
             require(p.x[0] == 0);
             require(p.y[0] == 1);
+        }
+
+        let p1 = BabyJubjubPoint {
+            x: [0x6adb52fc9ee7a82c,
+                0x9de555e0ba6a693c,
+                0x9bc0d49fa725bddf,
+                0x274dbce8d1517996],
+            y: [0x4595febfd51eb853,
+                0xb2e78246231640b5,
+                0xe2eae9a542bd99f6,
+                0x5ce98c61b05f47f]
+        };
+
+        let p2 = BabyJubjubPoint {
+            x: [0x79f2349047d5c157,
+                0xc88fee14d607cbe7,
+                0x6e35bc47bd9afe6c,
+                0x2491aba8d3a191a7],
+            y: [0x348dd8f7f99152d7,
+                0xf9a9d4ed0cb0c1d1,
+                0x18dbddfd24c35583,
+                0x2e07297f8d3c3d78]
+        };
+
+        let r = BabyJubjubPoint {
+            x: [0x9067a2afaebaf361,
+                0x72dded51978190e1,
+                0xb3b811eaacd0ec7c,
+                0x11805510440a3488],
+            y:  [0xa100dd448e072c13,
+                 0xa89a9027777af9f,
+                 0xf9ff77744a39298a,
+                 0x1f07aa1b3c598e2f]
+        };
+
+        let p = BabyJubjubPoint::msm(vec![(&p1, &[1,0,0,0]), (&p2, &[1,0,0,0])]);
+
+        unsafe {
+            require(p.x[0] == r.x[0]);
+            require(p.y[0] == r.y[0]);
         }
         0
     }
