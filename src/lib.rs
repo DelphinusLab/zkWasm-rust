@@ -3,18 +3,18 @@ extern "C" {
     pub fn require(cond:i32);
     pub fn wasm_dbg(v:u64);
 
-    fn kvpair_setroot(x:u64);
-    fn kvpair_address(x:u64);
-    fn kvpair_set(x:u64);
-    fn kvpair_get() -> u64;
-    fn kvpair_getroot() -> u64;
-    fn poseidon_new(x:u64);
-    fn poseidon_push(x:u64);
-    fn poseidon_finalize() -> u64;
+    pub fn kvpair_setroot(x:u64);
+    pub fn kvpair_address(x:u64);
+    pub fn kvpair_set(x:u64);
+    pub fn kvpair_get() -> u64;
+    pub fn kvpair_getroot() -> u64;
+    pub fn poseidon_new(x:u64);
+    pub fn poseidon_push(x:u64);
+    pub fn poseidon_finalize() -> u64;
 
-    fn babyjubjub_sum_new(x:u64);
-    fn babyjubjub_sum_push(x:u64);
-    fn babyjubjub_sum_finalize() -> u64;
+    pub fn babyjubjub_sum_new(x:u64);
+    pub fn babyjubjub_sum_push(x:u64);
+    pub fn babyjubjub_sum_finalize() -> u64;
 
 }
 
@@ -204,6 +204,30 @@ impl BabyJubjubPoint {
     }
 }
 
+pub struct JubjubSignature {
+    pub sig_r: BabyJubjubPoint,
+    pub neg_sig_s: [u64; 4],
+}
+
+// 0 = c . pk + R - S . P_G that requires all points to be in the same group
+// let lhs = vk.mul_scalar(&c).add(&sig_r);
+// let rhs = p_g.mul_scalar(&sig_s);
+
+
+impl JubjubSignature {
+    pub fn verify(&self, pk: &BabyJubjubPoint, base: &BabyJubjubPoint, msghash: &[u64; 4]) {
+        unsafe {
+            let r = BabyJubjubPoint::msm(vec![
+                (pk, msghash),
+                (&self.sig_r, &[1,0,0,0]),
+                (base, &self.neg_sig_s),
+            ]);
+            require(if r.x == [0,0,0,0] { 1 } else {0} );
+            require(if r.y == [1,0,0,0] { 1 } else {0} );
+        }
+    }
+}
+
 
 #[cfg(feature = "test")]
 
@@ -214,17 +238,18 @@ mod test {
         pub fn require(cond:bool);
         pub fn wasm_dbg(v:u64);
 
-        fn kvpair_setroot(x:u64);
-        fn kvpair_address(x:u64);
-        fn kvpair_set(x:u64);
-        fn kvpair_get() -> u64;
-        fn kvpair_getroot() -> u64;
-        fn poseidon_new(x:u64);
-        fn poseidon_push(x:u64);
-        fn poseidon_finalize() -> u64;
+        pub fn kvpair_setroot(x:u64);
+        pub fn kvpair_address(x:u64);
+        pub fn kvpair_set(x:u64);
+        pub fn kvpair_get() -> u64;
+        pub fn kvpair_getroot() -> u64;
+        pub fn poseidon_new(x:u64);
+        pub fn poseidon_push(x:u64);
+        pub fn poseidon_finalize() -> u64;
     }
 
     use super::BabyJubjubPoint;
+    use super::JubjubSignature;
 
 
     use wasm_bindgen::prelude::*;
@@ -251,7 +276,7 @@ mod test {
             require(p.y[0] == 1);
         }
 
-        let p1 = BabyJubjubPoint {
+        let base = BabyJubjubPoint {
             x: [0x6adb52fc9ee7a82c,
                 0x9de555e0ba6a693c,
                 0x9bc0d49fa725bddf,
@@ -262,18 +287,21 @@ mod test {
                 0x5ce98c61b05f47f]
         };
 
-        let p2 = BabyJubjubPoint {
-            x: [0x79f2349047d5c157,
-                0xc88fee14d607cbe7,
-                0x6e35bc47bd9afe6c,
-                0x2491aba8d3a191a7],
-            y: [0x348dd8f7f99152d7,
-                0xf9a9d4ed0cb0c1d1,
-                0x18dbddfd24c35583,
-                0x2e07297f8d3c3d78]
+        let sig = JubjubSignature {
+            sig_r : BabyJubjubPoint {
+                x: [0x79f2349047d5c157,
+                    0xc88fee14d607cbe7,
+                    0x6e35bc47bd9afe6c,
+                    0x2491aba8d3a191a7],
+                y: [0x348dd8f7f99152d7,
+                    0xf9a9d4ed0cb0c1d1,
+                    0x18dbddfd24c35583,
+                    0x2e07297f8d3c3d78]
+            },
+            neg_sig_s: [0,0,0,0]
         };
 
-        let r = BabyJubjubPoint {
+        let pk = BabyJubjubPoint {
             x: [0x9067a2afaebaf361,
                 0x72dded51978190e1,
                 0xb3b811eaacd0ec7c,
@@ -284,12 +312,7 @@ mod test {
                  0x1f07aa1b3c598e2f]
         };
 
-        let p = BabyJubjubPoint::msm(vec![(&p1, &[1,0,0,0]), (&p2, &[1,0,0,0])]);
-
-        unsafe {
-            require(p.x[0] == r.x[0]);
-            require(p.y[0] == r.y[0]);
-        }
+        sig.verify(&pk, &base, &[0,0,0,0]);
         0
     }
 }
