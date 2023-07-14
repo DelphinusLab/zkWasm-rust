@@ -1,6 +1,6 @@
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
-    pub fn require(cond:i32);
+    pub fn require(cond:bool);
     pub fn wasm_dbg(v:u64);
 
     pub fn kvpair_setroot(x:u64);
@@ -151,6 +151,28 @@ pub struct BabyJubjubPoint {
     y: [u64;4],
 }
 
+pub const MODULUS: [u64; 4] = [
+    0x43e1f593f0000001,
+    0x2833e84879b97091,
+    0xb85045b68181585d,
+    0x30644e72e131a029,
+];
+
+pub fn negative_of_fr(b: &[u64; 4]) -> [u64; 4] {
+    let mut borrow = 0;
+    let mut a = MODULUS.clone();
+    for i in 0..4 {
+        if a[i] - borrow < b[i] {
+            a[i] += (u64::MAX - b[i]) + 1 - borrow;
+            borrow = 1
+        } else {
+            a[i] -= b[i] + borrow;
+            borrow = 0;
+        }
+    };
+    a
+}
+
 impl BabyJubjubPoint {
     pub fn msm(points: Vec<(&BabyJubjubPoint, &[u64; 4])>) -> BabyJubjubPoint {
         let mut len = points.len();
@@ -206,24 +228,28 @@ impl BabyJubjubPoint {
 
 pub struct JubjubSignature {
     pub sig_r: BabyJubjubPoint,
-    pub neg_sig_s: [u64; 4],
+    pub sig_s: [u64; 4],
 }
 
 // 0 = c . pk + R - S . P_G that requires all points to be in the same group
 // let lhs = vk.mul_scalar(&c).add(&sig_r);
 // let rhs = p_g.mul_scalar(&sig_s);
 
+const NEG_BASE:BabyJubjubPoint = BabyJubjubPoint {
+            x: [5098030607081443850, 11739138394996609992, 7617911478965053006, 103675969630295906],
+            y: [10973966134842004663, 8445032247919564157, 8665528646177973254, 405343104476405055],
+        };
 
 impl JubjubSignature {
-    pub fn verify(&self, pk: &BabyJubjubPoint, base: &BabyJubjubPoint, msghash: &[u64; 4]) {
+    pub fn verify(&self, pk: &BabyJubjubPoint, msghash: &[u64; 4]) {
         unsafe {
             let r = BabyJubjubPoint::msm(vec![
                 (pk, msghash),
                 (&self.sig_r, &[1,0,0,0]),
-                (base, &self.neg_sig_s),
+                (&NEG_BASE, &self.sig_s),
             ]);
-            require(if r.x == [0,0,0,0] { 1 } else {0} );
-            require(if r.y == [1,0,0,0] { 1 } else {0} );
+            require(r.x == [0,0,0,0]);
+            require(r.y == [1,0,0,0]);
         }
     }
 }
@@ -235,7 +261,7 @@ impl JubjubSignature {
 mod test {
     extern "C" {
         pub fn wasm_input(is_public: u32) -> u64;
-        pub fn require(cond:bool);
+        pub fn require(cond: bool);
         pub fn wasm_dbg(v:u64);
 
         pub fn kvpair_setroot(x:u64);
@@ -276,43 +302,21 @@ mod test {
             require(p.y[0] == 1);
         }
 
-        let base = BabyJubjubPoint {
-            x: [0x6adb52fc9ee7a82c,
-                0x9de555e0ba6a693c,
-                0x9bc0d49fa725bddf,
-                0x274dbce8d1517996],
-            y: [0x4595febfd51eb853,
-                0xb2e78246231640b5,
-                0xe2eae9a542bd99f6,
-                0x5ce98c61b05f47f]
-        };
 
         let sig = JubjubSignature {
             sig_r : BabyJubjubPoint {
-                x: [0x79f2349047d5c157,
-                    0xc88fee14d607cbe7,
-                    0x6e35bc47bd9afe6c,
-                    0x2491aba8d3a191a7],
-                y: [0x348dd8f7f99152d7,
-                    0xf9a9d4ed0cb0c1d1,
-                    0x18dbddfd24c35583,
-                    0x2e07297f8d3c3d78]
+                x: [3942246333445170378, 4927712981048651912, 7483524259745080053, 60536396037540871],
+                y: [14850245140538961756, 11076552477444376689, 6805567804001881962, 3473463521075824379],
             },
-            neg_sig_s: [0,0,0,0]
+            sig_s: [13068069613806562103, 2598268142923890778, 9227627411507601187, 303022261472651166]
         };
 
         let pk = BabyJubjubPoint {
-            x: [0x9067a2afaebaf361,
-                0x72dded51978190e1,
-                0xb3b811eaacd0ec7c,
-                0x11805510440a3488],
-            y:  [0xa100dd448e072c13,
-                 0xa89a9027777af9f,
-                 0xf9ff77744a39298a,
-                 0x1f07aa1b3c598e2f]
+            x: [7885996749535148040, 5452996086172756687, 10631572794003595355, 1413880906945024417],
+            y: [13330009580783412631, 14458870954835491754, 9623332966787297474, 160649411381582638],
         };
 
-        sig.verify(&pk, &base, &[0,0,0,0]);
+        sig.verify(&pk, &[32195221423877958,0,0,0]);
         0
     }
 }
