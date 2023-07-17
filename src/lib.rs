@@ -147,8 +147,8 @@ impl PoseidonHasher {
 }
 
 pub struct BabyJubjubPoint {
-    x: [u64;4],
-    y: [u64;4],
+    pub x: [u64;4],
+    pub y: [u64;4],
 }
 
 pub const MODULUS: [u64; 4] = [
