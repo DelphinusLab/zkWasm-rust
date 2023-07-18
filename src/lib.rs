@@ -1,3 +1,5 @@
+use primitive_types::U256;
+
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
     pub fn require(cond:bool);
@@ -146,9 +148,10 @@ impl PoseidonHasher {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct BabyJubjubPoint {
-    pub x: [u64;4],
-    pub y: [u64;4],
+    pub x: U256,
+    pub y: U256,
 }
 
 pub const MODULUS: [u64; 4] = [
@@ -181,14 +184,14 @@ impl BabyJubjubPoint {
         }
         for (point, scalar) in points {
             unsafe {
-                babyjubjub_sum_push(point.x[0]);
-                babyjubjub_sum_push(point.x[1]);
-                babyjubjub_sum_push(point.x[2]);
-                babyjubjub_sum_push(point.x[3]);
-                babyjubjub_sum_push(point.y[0]);
-                babyjubjub_sum_push(point.y[1]);
-                babyjubjub_sum_push(point.y[2]);
-                babyjubjub_sum_push(point.y[3]);
+                babyjubjub_sum_push(point.x.0[0]);
+                babyjubjub_sum_push(point.x.0[1]);
+                babyjubjub_sum_push(point.x.0[2]);
+                babyjubjub_sum_push(point.x.0[3]);
+                babyjubjub_sum_push(point.y.0[0]);
+                babyjubjub_sum_push(point.y.0[1]);
+                babyjubjub_sum_push(point.y.0[2]);
+                babyjubjub_sum_push(point.y.0[3]);
                 babyjubjub_sum_push(scalar[0]);
                 babyjubjub_sum_push(scalar[1]);
                 babyjubjub_sum_push(scalar[2]);
@@ -209,23 +212,24 @@ impl BabyJubjubPoint {
         }
         unsafe {
             BabyJubjubPoint {
-                x: [
+                x: U256([
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
-                ],
-                y: [
+                ]),
+                y: U256([
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
                    babyjubjub_sum_finalize(),
-                ],
+                ]),
             }
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct JubjubSignature {
     pub sig_r: BabyJubjubPoint,
     pub sig_s: [u64; 4],
@@ -236,8 +240,8 @@ pub struct JubjubSignature {
 // let rhs = p_g.mul_scalar(&sig_s);
 
 const NEG_BASE:BabyJubjubPoint = BabyJubjubPoint {
-            x: [5098030607081443850, 11739138394996609992, 7617911478965053006, 103675969630295906],
-            y: [10973966134842004663, 8445032247919564157, 8665528646177973254, 405343104476405055],
+            x: U256([5098030607081443850, 11739138394996609992, 7617911478965053006, 103675969630295906]),
+            y: U256([10973966134842004663, 8445032247919564157, 8665528646177973254, 405343104476405055]),
         };
 
 impl JubjubSignature {
@@ -248,8 +252,8 @@ impl JubjubSignature {
                 (&self.sig_r, &[1,0,0,0]),
                 (&NEG_BASE, &self.sig_s),
             ]);
-            require(r.x == [0,0,0,0]);
-            require(r.y == [1,0,0,0]);
+            require(r.x == U256([0,0,0,0]));
+            require(r.y == U256([1,0,0,0]));
         }
     }
 }
