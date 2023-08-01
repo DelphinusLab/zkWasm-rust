@@ -5,11 +5,13 @@ extern "C" {
     pub fn require(cond:bool);
     pub fn wasm_dbg(v:u64);
 
-    pub fn kvpair_setroot(x:u64);
-    pub fn kvpair_address(x:u64);
-    pub fn kvpair_set(x:u64);
-    pub fn kvpair_get() -> u64;
-    pub fn kvpair_getroot() -> u64;
+    pub fn merkle_setroot(x:u64);
+    pub fn merkle_address(x:u64);
+    pub fn merkle_set(x:u64);
+    pub fn merkle_get() -> u64;
+    pub fn merkle_getroot() -> u64;
+    pub fn merkle_fetch_data() -> u64;
+    pub fn merkle_put_data(x:u64);
     pub fn poseidon_new(x:u64);
     pub fn poseidon_push(x:u64);
     pub fn poseidon_finalize() -> u64;
@@ -20,68 +22,94 @@ extern "C" {
 
 }
 
-pub struct Merkle {}
+pub struct Merkle {
+    pub root: [u64; 4]
+}
 
 impl Merkle {
-    pub fn load(root: &[u64; 4]) {
+    /// New Merkle with initial root hash
+    /// set root with move to avoid copy
+    pub fn load(root: [u64; 4]) -> Self {
+        Merkle { root }
+    }
+
+    pub fn new() -> Self {
+        //THE following is the depth=31, 32 level merkle root default
+        let root = [11826054925775482837, 5943555147602679911, 3550282808714298530, 3363170373529648096];
+        Merkle { root }
+    }
+
+    pub fn get(&self, index: u64, data: &mut [u64]) -> u64 {
+        let mut hash = [0; 4];
         unsafe {
-            kvpair_setroot(root[0]);
-            kvpair_setroot(root[1]);
-            kvpair_setroot(root[2]);
-            kvpair_setroot(root[3]);
+            merkle_address(index);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            hash[0] = merkle_get();
+            hash[1] = merkle_get();
+            hash[2] = merkle_get();
+            hash[3] = merkle_get();
+
+            let len = merkle_fetch_data();
+            require(len <= data.len() as u64);
+            for i in 0..len {
+                data[i as usize] = merkle_fetch_data();
+                wasm_dbg(data[i as usize]);
+            }
+
+            // FIXME: avoid copy here
+            let hash_check = PoseidonHasher::hash(&data[0..len as usize]);
+            require(hash[0] == hash_check[0]);
+            require(hash[1] == hash_check[1]);
+            require(hash[2] == hash_check[2]);
+            require(hash[3] == hash_check[3]);
+            len
         }
     }
 
-    pub fn new() {
-        //TODO: fix the hardcoded height 20 merkle root
-        let root = [253654092113440498, 968977278742622784, 6195234659416948485, 820733412028077155];
-        unsafe {
-            kvpair_setroot(root[0]);
-            kvpair_setroot(root[1]);
-            kvpair_setroot(root[2]);
-            kvpair_setroot(root[3]);
-        }
-    }
 
-    pub fn get(index: u64) -> [u64; 4] {
-        let mut data = [0; 4];
+    pub fn set(&mut self, index: u64, data: &[u64]) {
+        // place a dummy get for merkle proof convension
         unsafe {
-            kvpair_address(index);
-            data[0] = kvpair_get();
-            data[1] = kvpair_get();
-            data[2] = kvpair_get();
-            data[3] = kvpair_get();
-        }
-        data
-    }
+            merkle_address(index);
 
-    pub fn getroot() -> [u64; 4] {
-        let mut data = [0; 4];
-        unsafe {
-            data[0] = kvpair_getroot();
-            data[1] = kvpair_getroot();
-            data[2] = kvpair_getroot();
-            data[3] = kvpair_getroot();
-        }
-        data
-    }
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
 
-    pub fn set(index: u64, data: &[u64; 4]) {
-        unsafe {
-            kvpair_address(index);
-            kvpair_set(data[0]);
-            kvpair_set(data[1]);
-            kvpair_set(data[2]);
-            kvpair_set(data[3]);
+            merkle_get();
+            merkle_get();
+            merkle_get();
+            merkle_get();
         }
-    }
 
-    pub fn setroot(data: &[u64; 4]) {
         unsafe {
-            kvpair_setroot(data[0]);
-            kvpair_setroot(data[1]);
-            kvpair_setroot(data[2]);
-            kvpair_setroot(data[3]);
+            merkle_address(index);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            for d in data.iter() {
+                merkle_put_data(*d);
+            }
+
+            let hash = PoseidonHasher::hash(data);
+            merkle_set(hash[0]);
+            merkle_set(hash[1]);
+            merkle_set(hash[2]);
+            merkle_set(hash[3]);
+
+            self.root[0] = merkle_getroot();
+            self.root[1] = merkle_getroot();
+            self.root[2] = merkle_getroot();
+            self.root[3] = merkle_getroot();
         }
     }
 }
@@ -94,6 +122,13 @@ impl PoseidonHasher {
             poseidon_new(1u64);
         }
         PoseidonHasher(0u64)
+    }
+    pub fn hash(data: &[u64]) -> [u64; 4] {
+        let mut hasher = Self::new();
+        for d in data.iter() {
+            hasher.update(*d);
+        }
+        hasher.finalize()
     }
     pub fn update(&mut self, v:u64) {
         unsafe {
@@ -112,11 +147,13 @@ impl PoseidonHasher {
         }
     }
     pub fn finalize(&mut self) -> [u64; 4] {
-        for _ in (self.0 & 0x3) .. 4 {
-            unsafe {
-                poseidon_push(0);
+        if (self.0 & 0x3) != 0 {
+            for _ in (self.0 & 0x3) .. 4 {
+                unsafe {
+                    poseidon_push(0);
+                }
+                self.0 += 1;
             }
-            self.0 += 1;
         }
         if self.0 == 32 {
             unsafe {
@@ -289,7 +326,7 @@ mod test {
     #[wasm_bindgen]
     pub fn zkmain() -> i64 {
         let mut hasher = PoseidonHasher::new();
-        let data = vec![0x1, 0, 0];
+        let data = vec![0x1, 0x1, 2, 2];
         for d in data {
             hasher.update(d);
         }
@@ -300,13 +337,29 @@ mod test {
         }
         */
 
-        Merkle::new();
+        let mut merkle = Merkle::new();
+        let mut leaf = [0,0,0,0];
 
-        Merkle::set(0, &[1,1,2,2]);
-        let c = Merkle::get(0);
+        merkle.set(0, &[1,1,2,2]);
+
+        let len = merkle.get(0, &mut leaf);
+
         unsafe {
-            require(c == [1,1,2,2]);
+            require(len == 4);
+            require(leaf == [1,1,2,2]);
         }
+
+
+        merkle.set(0, &[3,4,5,6,7]);
+        let mut leaf = [0,0,0,0,0];
+
+        let len = merkle.get(0, &mut leaf);
+
+        unsafe {
+            require(len == 5);
+            require(leaf == [3,4,5,6,7]);
+        }
+
 
         let c = BabyJubjubPoint {x:U256([0,0,0,0]), y:U256([1, 0, 0, 0])};
         let p = BabyJubjubPoint::msm(vec![(&c, &[1,0,0,0])]);
