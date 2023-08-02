@@ -39,7 +39,60 @@ impl Merkle {
         Merkle { root }
     }
 
-    pub fn get(&self, index: u64, data: &mut [u64]) -> u64 {
+    pub fn get_simple(&self, index: u64, data: &mut [u64; 4]) {
+        unsafe {
+            merkle_address(index);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            data[0] = merkle_get();
+            data[1] = merkle_get();
+            data[2] = merkle_get();
+            data[3] = merkle_get();
+        }
+    }
+
+    pub fn set_simple(&mut self, index: u64, data: &[u64; 4]) {
+        // place a dummy get for merkle proof convension
+        unsafe {
+            merkle_address(index);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            merkle_get();
+            merkle_get();
+            merkle_get();
+            merkle_get();
+        }
+
+        unsafe {
+            merkle_address(index);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            merkle_set(data[0]);
+            merkle_set(data[1]);
+            merkle_set(data[2]);
+            merkle_set(data[3]);
+
+            self.root[0] = merkle_getroot();
+            self.root[1] = merkle_getroot();
+            self.root[2] = merkle_getroot();
+            self.root[3] = merkle_getroot();
+        }
+    }
+
+
+    pub fn get(&self, index: u64, data: &mut [u64], pad: bool) -> u64 {
         let mut hash = [0; 4];
         unsafe {
             merkle_address(index);
@@ -62,7 +115,7 @@ impl Merkle {
             }
 
             // FIXME: avoid copy here
-            let hash_check = PoseidonHasher::hash(&data[0..len as usize]);
+            let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
             require(hash[0] == hash_check[0]);
             require(hash[1] == hash_check[1]);
             require(hash[2] == hash_check[2]);
@@ -72,7 +125,7 @@ impl Merkle {
     }
 
 
-    pub fn set(&mut self, index: u64, data: &[u64]) {
+    pub fn set(&mut self, index: u64, data: &[u64], pad: bool) {
         // place a dummy get for merkle proof convension
         unsafe {
             merkle_address(index);
@@ -100,7 +153,7 @@ impl Merkle {
                 merkle_put_data(*d);
             }
 
-            let hash = PoseidonHasher::hash(data);
+            let hash = PoseidonHasher::hash(data, pad);
             merkle_set(hash[0]);
             merkle_set(hash[1]);
             merkle_set(hash[2]);
@@ -123,10 +176,25 @@ impl PoseidonHasher {
         }
         PoseidonHasher(0u64)
     }
-    pub fn hash(data: &[u64]) -> [u64; 4] {
+    pub fn hash(data: &[u64], padding: bool) -> [u64; 4] {
         let mut hasher = Self::new();
-        for d in data.iter() {
-            hasher.update(*d);
+        if padding {
+            let group = data.len() / 3;
+            let mut j = 0;
+            for i in 0..group {
+                j = i*3;
+                hasher.update(data[j]);
+                hasher.update(data[j+1]);
+                hasher.update(data[j+2]);
+                hasher.update(0u64);
+            }
+            for i in j..data.len() {
+                hasher.update(data[i]);
+            }
+        } else {
+            for d in data {
+                hasher.update(*d);
+            }
         }
         hasher.finalize()
     }
@@ -340,9 +408,9 @@ mod test {
         let mut merkle = Merkle::new();
         let mut leaf = [0,0,0,0];
 
-        merkle.set(0, &[1,1,2,2]);
+        merkle.set(0, &[1,1,2,2], false);
 
-        let len = merkle.get(0, &mut leaf);
+        let len = merkle.get(0, &mut leaf, false);
 
         unsafe {
             require(len == 4);
@@ -350,15 +418,26 @@ mod test {
         }
 
 
-        merkle.set(0, &[3,4,5,6,7]);
+        merkle.set(0, &[3,4,5,6,7], true);
         let mut leaf = [0,0,0,0,0];
 
-        let len = merkle.get(0, &mut leaf);
+        let len = merkle.get(0, &mut leaf, true);
 
         unsafe {
             require(len == 5);
             require(leaf == [3,4,5,6,7]);
         }
+
+        merkle.set_simple(1, &[4,5,6,7]);
+        let mut leaf2 = [0,0,0,0];
+
+        merkle.get_simple(1, &mut leaf2);
+
+        unsafe {
+            require(leaf2 == [4,5,6,7]);
+        }
+
+
 
 
         let c = BabyJubjubPoint {x:U256([0,0,0,0]), y:U256([1, 0, 0, 0])};
