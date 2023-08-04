@@ -108,18 +108,20 @@ impl Merkle {
             hash[3] = merkle_get();
 
             let len = merkle_fetch_data();
-            require(len <= data.len() as u64);
-            for i in 0..len {
-                data[i as usize] = merkle_fetch_data();
-                wasm_dbg(data[i as usize]);
-            }
+            if len>0 {
+                require(len <= data.len() as u64);
+                for i in 0..len {
+                    data[i as usize] = merkle_fetch_data();
+                    wasm_dbg(data[i as usize]);
+                }
 
-            // FIXME: avoid copy here
-            let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
-            require(hash[0] == hash_check[0]);
-            require(hash[1] == hash_check[1]);
-            require(hash[2] == hash_check[2]);
-            require(hash[3] == hash_check[3]);
+                // FIXME: avoid copy here
+                let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
+                require(hash[0] == hash_check[0]);
+                require(hash[1] == hash_check[1]);
+                require(hash[2] == hash_check[2]);
+                require(hash[3] == hash_check[3]);
+            }
             len
         }
     }
