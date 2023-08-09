@@ -112,7 +112,6 @@ impl Merkle {
                 require(len <= data.len() as u64);
                 for i in 0..len {
                     data[i as usize] = merkle_fetch_data();
-                    wasm_dbg(data[i as usize]);
                 }
 
                 // FIXME: avoid copy here
