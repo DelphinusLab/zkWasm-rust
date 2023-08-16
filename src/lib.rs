@@ -2,6 +2,9 @@ use primitive_types::U256;
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
+    pub fn wasm_output(v: u64);
+    pub fn wasm_read_context() -> u64;
+    pub fn wasm_write_context(v: u64);
     pub fn require(cond:bool);
     pub fn wasm_dbg(v:u64);
 
