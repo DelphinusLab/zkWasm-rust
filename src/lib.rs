@@ -192,6 +192,7 @@ impl PoseidonHasher {
                 hasher.update(data[j+2]);
                 hasher.update(0u64);
             }
+            j += 3;
             for i in j..data.len() {
                 hasher.update(data[i]);
             }
