@@ -38,7 +38,7 @@ impl Merkle {
 
     pub fn new() -> Self {
         //THE following is the depth=31, 32 level merkle root default
-        let root = [11826054925775482837, 5943555147602679911, 3550282808714298530, 3363170373529648096];
+        let root = [5647113874217112664, 14689602159481241585, 4257643359784105407, 2925219336634521956];
         Merkle { root }
     }
 
@@ -55,6 +55,13 @@ impl Merkle {
             data[1] = merkle_get();
             data[2] = merkle_get();
             data[3] = merkle_get();
+
+            //enforce root does not change
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+
         }
     }
 
@@ -72,6 +79,12 @@ impl Merkle {
             merkle_get();
             merkle_get();
             merkle_get();
+
+            //enforce root does not change
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
         }
 
         unsafe {
@@ -110,6 +123,12 @@ impl Merkle {
             hash[2] = merkle_get();
             hash[3] = merkle_get();
 
+            //enforce root does not change
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+
             let len = merkle_fetch_data();
             if len>0 {
                 require(len <= data.len() as u64);
@@ -143,6 +162,12 @@ impl Merkle {
             merkle_get();
             merkle_get();
             merkle_get();
+
+            //enforce root does not change
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
         }
 
         unsafe {
