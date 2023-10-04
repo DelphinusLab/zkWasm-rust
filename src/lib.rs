@@ -312,7 +312,7 @@ pub fn negative_of_fr(b: &[u64; 4]) -> [u64; 4] {
 }
 
 impl BabyJubjubPoint {
-    pub fn msm(points: Vec<(&BabyJubjubPoint, &[u64; 4])>) -> BabyJubjubPoint {
+    pub fn msm(points: &[(&BabyJubjubPoint, &[u64; 4])]) -> BabyJubjubPoint {
         let mut len = points.len();
         unsafe {
             babyjubjub_sum_new(1u64);
@@ -379,16 +379,17 @@ const NEG_BASE:BabyJubjubPoint = BabyJubjubPoint {
             y: U256([10973966134842004663, 8445032247919564157, 8665528646177973254, 405343104476405055]),
         };
 
+const ONE: U256 = U256([1, 0, 0, 0]);
+
 impl JubjubSignature {
     pub fn verify(&self, pk: &BabyJubjubPoint, msghash: &[u64; 4]) {
         unsafe {
-            let r = BabyJubjubPoint::msm(vec![
+            let r = BabyJubjubPoint::msm(&[
                 (pk, msghash),
-                (&self.sig_r, &[1,0,0,0]),
+                (&self.sig_r, &ONE.0),
                 (&NEG_BASE, &self.sig_s),
             ]);
-            require(r.x == U256([0,0,0,0]));
-            require(r.y == U256([1,0,0,0]));
+            require(r.x.is_zero() && r.y == ONE);
         }
     }
 }
