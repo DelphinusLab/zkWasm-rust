@@ -1,4 +1,6 @@
+#![feature(ptr_sub_ptr)]
 use primitive_types::U256;
+pub mod witness;
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
