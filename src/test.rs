@@ -12,8 +12,8 @@ use primitive_types::U256;
 
 use super::PoseidonHasher;
 use wasm_bindgen::prelude::*;
-#[wasm_bindgen]
-pub fn zkmain() -> i64 {
+
+pub fn test_merkle() {
     let mut hasher = PoseidonHasher::new();
     let data = vec![0x1, 0x1, 2, 2];
     for d in data {
@@ -56,7 +56,9 @@ pub fn zkmain() -> i64 {
     unsafe {
         require(leaf2 == [4, 5, 6, 7]);
     }
+}
 
+pub fn test_jubjub() {
     let c = BabyJubjubPoint {
         x: U256([0, 0, 0, 0]),
         y: U256([1, 0, 0, 0]),
@@ -107,5 +109,15 @@ pub fn zkmain() -> i64 {
     };
 
     sig.verify(&pk, &[32195221423877958, 0, 0, 0]);
+}
+#[wasm_bindgen]
+pub fn zkmain() -> i64 {
+    if false {
+        test_merkle();
+        test_jubjub();
+    }
+    if true {
+        super::witness::test_witness_obj();
+    }
     0
 }
