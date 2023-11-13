@@ -5,12 +5,12 @@ extern "C" {
     pub fn require(cond: bool);
 }
 
-use super::BabyJubjubPoint;
-use super::JubjubSignature;
-use super::Merkle;
+use crate::jubjub::BabyJubjubPoint;
+use crate::jubjub::JubjubSignature;
+use crate::merkle::Merkle;
 use primitive_types::U256;
 
-use super::PoseidonHasher;
+use crate::poseidon::PoseidonHasher;
 use wasm_bindgen::prelude::*;
 
 pub fn test_merkle() {
