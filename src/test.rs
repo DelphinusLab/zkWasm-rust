@@ -8,6 +8,7 @@ extern "C" {
 use crate::jubjub::BabyJubjubPoint;
 use crate::jubjub::JubjubSignature;
 use crate::merkle::Merkle;
+use crate::wasm_dbg;
 use primitive_types::U256;
 
 use crate::poseidon::PoseidonHasher;
@@ -20,6 +21,7 @@ pub fn test_merkle() {
         hasher.update(d);
     }
     let z = hasher.finalize();
+    unsafe {wasm_dbg(z[0])};
     /*
     unsafe {
         require(z[0] == 1);
