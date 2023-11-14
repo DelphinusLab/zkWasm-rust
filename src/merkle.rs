@@ -13,16 +13,48 @@ use crate::poseidon::PoseidonHasher;
 
 pub struct Merkle {
     pub root: [u64; 4],
-    pub last_get: Option<u64>,
 }
 
-static mut LAST_GET_ROOT: Option<[u64; 4]> = None;
+#[derive (PartialEq)]
+pub struct Track {
+    pub last_index: u64,
+    pub last_root: [u64; 4],
+}
+
+// track the last merkle_root of a merkle_get
+static mut LAST_TRACK: Option<Track> = None;
+
+impl Track {
+    pub fn set_track(root: &[u64; 4], index: u64) {
+        unsafe {
+            LAST_TRACK = Some (Track {
+                last_root: root.clone(),
+                last_index: index,
+            })
+        }
+    }
+
+    pub fn reset_track() {
+        unsafe {
+            LAST_TRACK = None
+        }
+    }
+
+    pub fn tracked(root: &[u64; 4], index: u64) -> bool {
+        unsafe {
+            LAST_TRACK == Some (Track {
+                last_root: root.clone(),
+                last_index: index,
+            })
+        }
+    }
+}
 
 impl Merkle {
     /// New Merkle with initial root hash
     /// set root with move to avoid copy
     pub fn load(root: [u64; 4]) -> Self {
-        Merkle { root, last_get: None}
+        Merkle { root }
     }
 
     pub fn new() -> Self {
@@ -33,7 +65,7 @@ impl Merkle {
             4257643359784105407,
             2925219336634521956,
         ];
-        Merkle { root, last_get: None }
+        Merkle { root }
     }
 
     pub fn get_simple(&mut self, index: u64, data: &mut [u64; 4]) {
@@ -56,14 +88,12 @@ impl Merkle {
             merkle_getroot();
             merkle_getroot();
         }
-        self.last_get = Some(index);
-        unsafe { LAST_GET_ROOT = Some(self.root) }
+        Track::set_track(&self.root, index);
     }
 
     pub fn set_simple(&mut self, index: u64, data: &[u64; 4]) {
         // place a dummy get for merkle proof convension
-        if self.last_get == Some (index)
-            && unsafe {LAST_GET_ROOT == Some(self.root)} {
+        if Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
@@ -106,8 +136,7 @@ impl Merkle {
             self.root[3] = merkle_getroot();
         }
 
-        self.last_get = None;
-        unsafe { LAST_GET_ROOT = None };
+        Track::reset_track();
     }
 
     pub fn get(&mut self, index: u64, data: &mut [u64], pad: bool) -> u64 {
@@ -147,14 +176,12 @@ impl Merkle {
             }
             len
         };
-        self.last_get = Some(index);
-        unsafe { LAST_GET_ROOT = Some(self.root) };
+        Track::set_track(&self.root, index);
         len
     }
 
     pub fn set(&mut self, index: u64, data: &[u64], pad: bool) {
-        if self.last_get == Some (index)
-            && unsafe {LAST_GET_ROOT == Some(self.root)} {
+        if Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
@@ -201,7 +228,6 @@ impl Merkle {
             self.root[2] = merkle_getroot();
             self.root[3] = merkle_getroot();
         };
-        self.last_get = None;
-        unsafe { LAST_GET_ROOT = None };
+        Track::reset_track();
     }
 }
