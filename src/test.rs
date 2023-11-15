@@ -1,4 +1,3 @@
-
 extern "C" {
     //pub fn wasm_input(is_public: u32) -> u64;
     //pub fn wasm_dbg(v:u64);
