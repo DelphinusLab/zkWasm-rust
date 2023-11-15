@@ -9,7 +9,7 @@ set -x
 FUNC=zkmain
 
 # Single test
-~/zkWasm/target/release/delphinus-cli -k 22 --function $FUNC --output ./output --param ./output --wasm ./pkg/output.wasm setup
+#~/zkWasm/target/release/delphinus-cli -k 22 --function $FUNC --output ./output --param ./output --wasm ./pkg/output.wasm setup
 ~/zkWasm/target/release/delphinus-cli -k 22 --function $FUNC --output ./output --param ./output --wasm ./pkg/output.wasm dry-run
 
 # Perform host circuit proofs
