@@ -7,6 +7,7 @@ extern "C" {
     pub fn wasm_write_context(v: u64);
     pub fn require(cond: bool);
     pub fn wasm_dbg(v: u64);
+    pub fn wasm_dbg_char(v: u64);
 
     pub fn merkle_setroot(x: u64);
     pub fn merkle_address(x: u64);
@@ -29,6 +30,30 @@ pub mod merkle;
 pub mod poseidon;
 pub mod jubjub;
 pub mod witness;
+
+pub fn wasm_dbg_str(s: &str) {
+    unsafe {
+        require(s.len() < usize::MAX);
+    }
+    for i in s.as_bytes() {
+    unsafe {wasm_dbg_char(*i as u64)}
+    }
+}
+
+#[macro_export]
+macro_rules! dbg {
+    ($fmt:literal $(, $args:tt)* $(,)?)
+        => {
+            let _ = $crate::wasm_dbg_str(&format!($fmt $(, $args)*));
+        };
+}
+#[macro_export]
+macro_rules! dbgln {
+    ($fmt:literal $(, $args:tt)* $(,)?) => {
+        $dbg!($fmt $(, $args)*);
+        $dbg!("\n");
+    };
+}
 
 #[cfg(feature = "test")]
 mod test;

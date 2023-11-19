@@ -1,6 +1,6 @@
 extern "C" {
-    /// injects a witness at the current wasm_private inputs cursor
-    pub fn wasm_witness_inject(u: u64);
+    /// inserts a witness at the current wasm_private inputs cursor
+    pub fn wasm_witness_insert(u: u64);
     pub fn wasm_witness_pop() -> u64;
     pub fn wasm_input(x: u32) -> u64;
     pub fn require(cond: bool);
@@ -94,7 +94,7 @@ pub trait WitnessObjReader {
 impl WitnessObjWriter for u64 {
     fn to_witness(&self, _ori_base: *const u8, _wit_base: *const u8) {
         unsafe {
-            wasm_witness_inject(*self);
+            wasm_witness_insert(*self);
         }
     }
 }
@@ -113,9 +113,9 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
         let arr_ptr = unsafe { wit_base.add((c[0] as *const u8).sub_ptr(ori_base)) };
         unsafe {
-            wasm_witness_inject(arr_ptr as u64);
-            wasm_witness_inject(c[1] as u64);
-            wasm_witness_inject(c[2] as u64);
+            wasm_witness_insert(arr_ptr as u64);
+            wasm_witness_insert(c[1] as u64);
+            wasm_witness_insert(c[2] as u64);
         }
         for t in self {
             t.to_witness(ori_base, wit_base);
@@ -156,7 +156,7 @@ fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     let c = Box::new(b.clone());
     let ori_base = unsafe { SIMPLE_ALLOCATOR.area.add(SIMPLE_ALLOCATOR.remaining) };
     unsafe {
-        wasm_witness_inject((c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64);
+        wasm_witness_insert((c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64);
     }
     c.to_witness(ori_base, base);
 }

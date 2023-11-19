@@ -120,5 +120,7 @@ pub fn zkmain() -> i64 {
     if true {
         super::witness::test_witness_obj();
     }
+    let a = 0;
+    super::dbg!("abc{}\n", a);
     0
 }
