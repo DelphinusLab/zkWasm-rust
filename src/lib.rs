@@ -26,9 +26,9 @@ extern "C" {
 
 }
 
+pub mod jubjub;
 pub mod merkle;
 pub mod poseidon;
-pub mod jubjub;
 pub mod witness;
 
 pub fn wasm_dbg_str(s: &str) {
@@ -36,7 +36,7 @@ pub fn wasm_dbg_str(s: &str) {
         require(s.len() < usize::MAX);
     }
     for i in s.as_bytes() {
-    unsafe {wasm_dbg_char(*i as u64)}
+        unsafe { wasm_dbg_char(*i as u64) }
     }
 }
 

@@ -8,8 +8,8 @@ extern "C" {
 }
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::ptr::null_mut;
 use std::mem::size_of;
+use std::ptr::null_mut;
 
 static mut WITNESS_AREA: usize = 0;
 static mut WITNESS_AREA_END: usize = 0;
@@ -173,7 +173,7 @@ fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
         stop_alloc_witness();
     }
 
-    let obj_offset = unsafe {wasm_witness_pop() as usize};
+    let obj_offset = unsafe { wasm_witness_pop() as usize };
     let obj_start = base as usize + obj_offset;
     let obj_end = obj_start + obj_offset;
     unsafe {
@@ -190,31 +190,28 @@ fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     base: *mut u8,
     prepare: impl FnOnce(*const u8),
 ) -> *const Obj {
-    let obj = load_witness_obj_inner(
-        base,
-        prepare,
-    );
+    let obj = load_witness_obj_inner(base, prepare);
     obj
 }
 
 #[inline(never)]
 pub fn prepare_u64_vec(base: *const u8, a: i64) {
-   prepare_witness_obj(
-       base,
-       |x: &u64| {
-           let mut a = vec![];
-           for i in 0..2000 {
-               a.push(*x + (i as u64));
-           }
-           a
-       },
-       &(a as u64),
-   );
+    prepare_witness_obj(
+        base,
+        |x: &u64| {
+            let mut a = vec![];
+            for i in 0..2000 {
+                a.push(*x + (i as u64));
+            }
+            a
+        },
+        &(a as u64),
+    );
 }
 
 pub fn test_witness_obj() {
     let base_addr = alloc_witness_memory();
-    unsafe {wasm_dbg(base_addr as u64)};
+    unsafe { wasm_dbg(base_addr as u64) };
     let obj = load_witness_obj::<Vec<u64>, u64>(base_addr, |base| prepare_u64_vec(base, 0));
     let v = unsafe { &*obj };
     for i in 0..100 {

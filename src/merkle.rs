@@ -8,14 +8,14 @@ extern "C" {
     pub fn merkle_put_data(x: u64);
 }
 
-use crate::require;
 use crate::poseidon::PoseidonHasher;
+use crate::require;
 
 pub struct Merkle {
     pub root: [u64; 4],
 }
 
-#[derive (PartialEq)]
+#[derive(PartialEq)]
 pub struct Track {
     pub last_index: u64,
     pub last_root: [u64; 4],
@@ -27,7 +27,7 @@ static mut LAST_TRACK: Option<Track> = None;
 impl Track {
     pub fn set_track(root: &[u64; 4], index: u64) {
         unsafe {
-            LAST_TRACK = Some (Track {
+            LAST_TRACK = Some(Track {
                 last_root: root.clone(),
                 last_index: index,
             })
@@ -35,17 +35,16 @@ impl Track {
     }
 
     pub fn reset_track() {
-        unsafe {
-            LAST_TRACK = None
-        }
+        unsafe { LAST_TRACK = None }
     }
 
     pub fn tracked(root: &[u64; 4], index: u64) -> bool {
         unsafe {
-            LAST_TRACK == Some (Track {
-                last_root: root.clone(),
-                last_index: index,
-            })
+            LAST_TRACK
+                == Some(Track {
+                    last_root: root.clone(),
+                    last_index: index,
+                })
         }
     }
 }

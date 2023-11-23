@@ -20,7 +20,7 @@ pub fn test_merkle() {
         hasher.update(d);
     }
     let z = hasher.finalize();
-    unsafe {wasm_dbg(z[0])};
+    unsafe { wasm_dbg(z[0]) };
     /*
     unsafe {
         require(z[0] == 1);

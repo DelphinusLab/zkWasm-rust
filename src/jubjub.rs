@@ -1,8 +1,8 @@
-use primitive_types::U256;
+use crate::babyjubjub_sum_finalize;
 use crate::babyjubjub_sum_new;
 use crate::babyjubjub_sum_push;
-use crate::babyjubjub_sum_finalize;
 use crate::require;
+use primitive_types::U256;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BabyJubjubPoint {
@@ -124,4 +124,3 @@ impl JubjubSignature {
         }
     }
 }
-
