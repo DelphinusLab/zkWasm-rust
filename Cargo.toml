@@ -11,7 +11,8 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-test = []
+wasmbind = []
+witness = [ "wasmbind"]
 
 [dependencies]
 primitive-types = {version="0.12.1", default-features = false}
