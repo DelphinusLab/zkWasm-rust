@@ -31,6 +31,11 @@ pub mod merkle;
 pub mod poseidon;
 pub mod witness;
 
+pub use jubjub::*;
+pub use merkle::*;
+pub use poseidon::*;
+pub use witness::*;
+
 pub fn wasm_dbg_str(s: &str) {
     unsafe {
         require(s.len() < usize::MAX);
