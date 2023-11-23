@@ -1,5 +1,5 @@
 #![cfg_attr(
-    feature = "wasmbind",
+    feature = "witness",
     feature(ptr_sub_ptr)
 )]
 
@@ -39,6 +39,8 @@ pub mod witness;
 pub use jubjub::*;
 pub use merkle::*;
 pub use poseidon::*;
+
+#[cfg(feature = "witness")]
 pub use witness::*;
 
 pub fn wasm_dbg_str(s: &str) {
