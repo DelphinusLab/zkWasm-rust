@@ -1,4 +1,7 @@
-#![feature(ptr_sub_ptr)]
+#![cfg_attr(
+    feature = "wasmbind",
+    feature(ptr_sub_ptr)
+)]
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
@@ -29,6 +32,8 @@ extern "C" {
 pub mod jubjub;
 pub mod merkle;
 pub mod poseidon;
+
+#[cfg(feature = "witness")]
 pub mod witness;
 
 pub use jubjub::*;
@@ -60,5 +65,5 @@ macro_rules! dbgln {
     };
 }
 
-#[cfg(feature = "test")]
+#[cfg(feature = "wasmbind")]
 mod test;
