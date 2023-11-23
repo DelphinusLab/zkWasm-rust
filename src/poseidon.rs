@@ -1,6 +1,6 @@
+use crate::poseidon_finalize;
 use crate::poseidon_new;
 use crate::poseidon_push;
-use crate::poseidon_finalize;
 
 pub struct PoseidonHasher(u64);
 
@@ -88,4 +88,3 @@ impl PoseidonHasher {
         }
     }
 }
-
