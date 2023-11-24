@@ -221,3 +221,19 @@ pub fn test_witness_obj() {
         };
     }
 }
+
+use derive_builder::WitnessObj;
+
+#[derive (WitnessObj)]
+struct testA {
+    Aa: u64,
+    Ab: u64,
+    Ac: Vec<u64>,
+}
+
+#[derive (WitnessObj)]
+struct testB {
+    Ba: testA,
+    Bc: Vec<u64>,
+    Bb: u64,
+}
