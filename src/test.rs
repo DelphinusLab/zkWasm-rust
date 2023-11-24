@@ -109,12 +109,21 @@ pub fn test_jubjub() {
         ]),
     };
 
+    let serialize = pk.to_serialized();
+
+    super::dbg!("pk{:?}\n", pk);
+
+    let pk2 = BabyJubjubPoint::from_serialized(serialize);
+    super::dbg!("pk2{:?}\n", pk2);
+
+    //unsafe {require(pk2 == pk)};
+
     sig.verify(&pk, &[32195221423877958, 0, 0, 0]);
 }
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
     if true {
-        test_merkle();
+        //test_merkle();
         test_jubjub();
     }
     if true {

@@ -3,6 +3,13 @@ use crate::babyjubjub_sum_new;
 use crate::babyjubjub_sum_push;
 use crate::require;
 use primitive_types::U256;
+use std::ops::SubAssign;
+use std::ops::MulAssign;
+use std::ops::AddAssign;
+use std::ops::{Mul, Sub, Add};
+use std::ops::Neg;
+use crate::ff::Field;
+use crate::ff::PrimeField;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BabyJubjubPoint {
@@ -81,6 +88,46 @@ impl BabyJubjubPoint {
                     babyjubjub_sum_finalize(),
                 ]),
             }
+        }
+    }
+
+    pub fn to_serialized(&self) -> U256 {
+        let mut r = self.y;
+        if self.x.0[0] & 0x1 == 0x1 {
+            r.0[3] |= 0x8000000000000000u64;
+        }
+        r
+    }
+
+    pub fn from_serialized(v: U256) -> Self {
+        use crate::bn256::Fr;
+        use crate::bn256::repr_from_u256;
+        use crate::bn256::repr_to_u256;
+        let mut y_repr = <Fr as PrimeField>::Repr::default();
+        let mut s = v;
+        s.0[3] &= 0x7fffffffffffffffu64;
+        repr_from_u256(y_repr.as_mut(), &s.0);
+        let y = <Fr as PrimeField>::from_repr(y_repr).unwrap();
+        let y2 = y.square(); // y^2
+        let mut y2d = y2;
+        let mut d = Fr::from(168696u64);
+        d.mul_assign(Fr::from(168700u64).invert().unwrap());
+        let d = d.neg();
+        y2d.mul_assign(d); // dy^2
+        y2d.add_assign(Fr::ONE); //dy^2 + 1
+        let mut x = y2;
+        x.sub_assign(Fr::ONE);  //y^2 - 1
+        //x = x.neg(); // 1 - y^2
+        x.mul_assign(y2d.invert().unwrap()); // y^2-1/1+dy^2
+        x = x.sqrt().unwrap();
+        let v = v.0[3];
+        let sign = (v & 0x8000000000000000u64) != 0;
+        if bool::from(x.is_odd()) != sign {
+            x = x.neg();
+        }
+        BabyJubjubPoint {
+            x: U256(repr_to_u256(x.to_repr())),
+            y: s,
         }
     }
 }

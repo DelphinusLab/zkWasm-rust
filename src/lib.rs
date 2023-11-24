@@ -1,7 +1,5 @@
-#![cfg_attr(
-    feature = "witness",
-    feature(ptr_sub_ptr)
-)]
+#![cfg_attr(feature = "witness", feature(ptr_sub_ptr))]
+use ff;
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
@@ -28,6 +26,8 @@ extern "C" {
     pub fn babyjubjub_sum_finalize() -> u64;
 
 }
+
+mod bn256;
 
 pub mod jubjub;
 pub mod merkle;
