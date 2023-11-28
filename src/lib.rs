@@ -22,7 +22,9 @@ extern "C" {
     pub fn poseidon_new(x: u64);
     pub fn poseidon_push(x: u64);
     pub fn poseidon_finalize() -> u64;
-
+    pub fn keccak_new(x: u64);
+    pub fn keccak_push(x: u64);
+    pub fn keccak_finalize() -> u64;
     pub fn babyjubjub_sum_new(x: u64);
     pub fn babyjubjub_sum_push(x: u64);
     pub fn babyjubjub_sum_finalize() -> u64;
@@ -32,6 +34,7 @@ extern "C" {
 pub mod jubjub;
 pub mod merkle;
 pub mod poseidon;
+pub mod keccak;
 
 #[cfg(feature = "witness")]
 pub mod witness;
