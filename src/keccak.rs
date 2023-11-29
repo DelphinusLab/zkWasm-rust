@@ -23,7 +23,7 @@ impl KeccakHasher {
             keccak_push(v);
         }
         self.0 += 1;
-        if self.0 == 17 {
+        if self.0 == 16 {
             unsafe {
                 keccak_finalize();
                 keccak_finalize();
@@ -46,7 +46,8 @@ impl KeccakHasher {
         } else if self.0 < 16 {
             unsafe {
                 keccak_push(starting_one_lane);
-                for _ in self.0 .. 16 {
+                for k in (self.0+1) .. 16 {
+                    crate::wasm_dbg(k);
                     keccak_push(0);
                 }
                 keccak_push(ending_one_lane);
@@ -62,76 +63,3 @@ impl KeccakHasher {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

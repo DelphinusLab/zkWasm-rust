@@ -11,6 +11,7 @@ use crate::wasm_dbg;
 use primitive_types::U256;
 
 use crate::poseidon::PoseidonHasher;
+use crate::keccak::KeccakHasher;
 use wasm_bindgen::prelude::*;
 
 pub fn test_merkle() {
@@ -111,11 +112,24 @@ pub fn test_jubjub() {
 
     sig.verify(&pk, &[32195221423877958, 0, 0, 0]);
 }
+
+pub fn test_keccak() {
+    let mut hasher = KeccakHasher::new();
+    let data = vec![0x1, 0x1, 2, 2];
+    for d in data {
+        hasher.update(d);
+    }
+    let keccak = hasher.finalize();
+    dbg!("keccak hasher is {:?}", keccak);
+}
+
+
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
     if true {
         test_merkle();
         test_jubjub();
+        test_keccak();
     }
     if true {
         super::witness::test_witness_obj();
