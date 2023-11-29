@@ -1,11 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Ident};
 
 struct Fd {
     name: Ident,
-    _ty: Type,
 }
 
 struct Context {
@@ -16,8 +15,7 @@ struct Context {
 impl From<Field> for Fd {
     fn from(f: Field) -> Self {
         Self {
-            name: f.ident.unwrap(),
-            _ty: f.ty,
+            name: f.ident.unwrap()
         }
     }
 }

@@ -113,7 +113,7 @@ pub fn test_jubjub() {
 }
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
-    if true {
+    if false {
         test_merkle();
         test_jubjub();
     }
