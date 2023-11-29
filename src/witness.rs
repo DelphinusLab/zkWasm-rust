@@ -13,7 +13,7 @@ use std::ptr::null_mut;
 
 static mut WITNESS_AREA: usize = 0;
 static mut WITNESS_AREA_END: usize = 0;
-const MAX_WITNESS_OBJ_SIZE: usize = 80 * 1024;
+const MAX_WITNESS_OBJ_SIZE: usize = 800 * 1024;
 const MAX_SUPPORTED_ALIGN: usize = 4096;
 
 static mut ALLOC_WITNESS: bool = false;
@@ -112,6 +112,12 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
     fn to_witness(&self, ori_base: *const u8, wit_base: *const u8) {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
         let arr_ptr = unsafe { wit_base.add((c[0] as *const u8).sub_ptr(ori_base)) };
+
+        super::dbg!("arr_ptr is {:?}\n", arr_ptr);
+
+        let v = c[1];
+        super::dbg!("{:?}\n", v);
+
         unsafe {
             wasm_witness_insert(arr_ptr as u64);
             wasm_witness_insert(c[1] as u64);
@@ -130,19 +136,22 @@ impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
             let arr_ptr = wasm_witness_pop() as usize;
             let len = wasm_witness_pop() as usize;
             let cap = wasm_witness_pop() as usize;
+
+            
+        super::dbg!("read arr_ptr is {:?} {:?} {:?}\n", arr_ptr, len, cap);
+
             let obj_ptr = obj as *mut usize;
             *obj_ptr = arr_ptr;
             *obj_ptr.add(1) = len;
             *obj_ptr.add(2) = cap;
-            let offset = arr_ptr as *mut T;
             let start = arr_ptr as usize;
             let mem_len = len * size_of::<T>();
+            super::dbg!("start is {} WITNESS_AREA is {}\n", start, WITNESS_AREA);
             require(start >= WITNESS_AREA);
             require(mem_len < MAX_WITNESS_OBJ_SIZE);
             require(start + len <= WITNESS_AREA_END);
             for i in 0..len {
-                //T::from_witness(unsafe { offset.add(i) as *mut T });
-                *(offset as *mut u64).add(i) = wasm_witness_pop();
+                (*(obj_ptr as *mut Vec<T>))[i].from_witness();
             }
         }
     }
@@ -254,12 +263,12 @@ pub fn test_witness_obj_test_a() {
     unsafe { wasm_dbg(base_addr as u64) };
     let obj = load_witness_obj::<TestA, usize>(base_addr, |base| prepare_test_a(base, 10));
     let v = unsafe { &*obj };
-    println!("test a is {:?}", v);
+    super::dbg!("test a is {:?}\n", v);
 }
 
 #[derive(WitnessObj, PartialEq, Clone, Debug)]
 struct TestB {
-    a: TestA,
+    a: Vec<TestA>,
     c: Vec<u64>,
     b: u64,
 }
@@ -270,15 +279,23 @@ pub fn prepare_test_b(base: *const u8, a: i64) {
         base,
         |x: &u64| {
             let mut c = vec![];
-            for i in 0..2000 {
-                c.push(*x + (i as u64));
+            let mut a_array = vec![];
+            for _ in 0..3 {
+                for i in 0..10 {
+                    c.push(*x + (i as u64));
+                }
+                let a = TestA {
+                    a: 1,
+                    b: 2,
+                    c: c.clone(),
+                };
+                a_array.push(a);
             }
-            let a = TestA {
-                a: 1,
-                b: 2,
-                c: c.clone(),
-            };
-            TestB { a, b: 3, c }
+            TestB {
+                a: a_array,
+                b: 3,
+                c,
+            }
         },
         &(a as u64),
     );
@@ -289,5 +306,5 @@ pub fn test_witness_obj_test_b() {
     unsafe { wasm_dbg(base_addr as u64) };
     let obj = load_witness_obj::<TestB, usize>(base_addr, |base| prepare_test_b(base, 0));
     let v = unsafe { &*obj };
-    println!("test b is {:?}", v);
+    super::dbg!("test b is {:?}\n", v);
 }
