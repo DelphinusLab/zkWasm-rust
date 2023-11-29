@@ -1,11 +1,11 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident, Data, Field, Type};
 use proc_macro2::TokenStream as TokenStream2;
+use quote::quote;
+use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Type};
 
 struct Fd {
     name: Ident,
-    ty: Type,
+    _ty: Type,
 }
 
 struct Context {
@@ -17,7 +17,7 @@ impl From<Field> for Fd {
     fn from(f: Field) -> Self {
         Self {
             name: f.ident.unwrap(),
-            ty: f.ty,
+            _ty: f.ty,
         }
     }
 }
@@ -27,7 +27,9 @@ impl From<DeriveInput> for Context {
         let name = input.ident;
         let fields = match input.data {
             Data::Struct(r) => r.fields,
-            _ => {panic!("Unsupported data type")}
+            _ => {
+                panic!("Unsupported data type")
+            }
         };
         let fds = fields.into_iter().map(Fd::from).collect();
         Self { name, fields: fds }
@@ -35,7 +37,7 @@ impl From<DeriveInput> for Context {
 }
 
 impl Context {
-    pub fn witnessobj_render(&self) -> TokenStream2 {
+    pub fn witness_obj_render(&self) -> TokenStream2 {
         let name = self.name.clone();
         let fields_writer = self.witness_writer();
         let fields_reader = self.witness_reader();
@@ -47,9 +49,10 @@ impl Context {
             }
 
             impl WitnessObjReader for #name {
-                fn from_witness(obj: *mut Self) {
-                    let obj_ptr = obj as *mut usize;
-                    #(#fields_reader)*
+                fn from_witness(&mut self) {
+                    unsafe {
+                        #(#fields_reader)*
+                    }
                 }
             }
         )
@@ -58,10 +61,8 @@ impl Context {
     fn witness_reader(&self) -> Vec<TokenStream2> {
         let mut ret = vec![];
         for i in 0..self.fields.len() {
-            let ty = self.fields[i].ty.clone();
             let name = self.fields[i].name.clone();
-            ret.push(quote!(self.#name.from_witness(obj_ptr as *mut #ty);));
-            ret.push(quote!(obj_ptr.add(sizeof(#ty));));
+            ret.push(quote!(self.#name.from_witness();));
         }
         ret
     }
@@ -77,7 +78,7 @@ impl Context {
 }
 
 #[proc_macro_derive(WitnessObj)]
-pub fn derive_witnessobj(input: TokenStream) -> TokenStream {
+pub fn derive_witness_obj(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    Context::from(input).witnessobj_render().into()
+    Context::from(input).witness_obj_render().into()
 }

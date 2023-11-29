@@ -88,7 +88,7 @@ pub trait WitnessObjWriter {
 }
 
 pub trait WitnessObjReader {
-    fn from_witness(obj: *mut Self);
+    fn from_witness(&mut self);
 }
 
 impl WitnessObjWriter for u64 {
@@ -100,9 +100,9 @@ impl WitnessObjWriter for u64 {
 }
 
 impl WitnessObjReader for u64 {
-    fn from_witness(obj: *mut Self) {
+    fn from_witness(&mut self) {
         unsafe {
-            *obj = wasm_witness_pop();
+            *self = wasm_witness_pop();
         }
     }
 }
@@ -124,8 +124,9 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
 }
 
 impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
-    fn from_witness(obj: *mut Self) {
+    fn from_witness(&mut self) {
         unsafe {
+            let obj = self as *mut Self;
             let arr_ptr = wasm_witness_pop() as usize;
             let len = wasm_witness_pop() as usize;
             let cap = wasm_witness_pop() as usize;
@@ -181,7 +182,9 @@ fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
         require(obj_end <= WITNESS_AREA_END);
     }
     let obj = obj_start as *mut Obj;
-    Obj::from_witness(obj);
+    unsafe {
+        (*obj).from_witness();
+    }
     obj as *const Obj
 }
 
@@ -224,16 +227,67 @@ pub fn test_witness_obj() {
 
 use derive_builder::WitnessObj;
 
-#[derive (WitnessObj)]
-struct testA {
-    Aa: u64,
-    Ab: u64,
-    Ac: Vec<u64>,
+#[derive(WitnessObj, PartialEq, Clone, Debug)]
+struct TestA {
+    a: u64,
+    b: u64,
+    c: Vec<u64>,
 }
 
-#[derive (WitnessObj)]
-struct testB {
-    Ba: testA,
-    Bc: Vec<u64>,
-    Bb: u64,
+#[inline(never)]
+pub fn prepare_test_a(base: *const u8, a: i64) {
+    prepare_witness_obj(
+        base,
+        |x: &u64| {
+            let mut c = vec![];
+            for i in 0..10 {
+                c.push(*x + (i as u64));
+            }
+            TestA { a: 1, b: 2, c }
+        },
+        &(a as u64),
+    );
+}
+
+pub fn test_witness_obj_test_a() {
+    let base_addr = alloc_witness_memory();
+    unsafe { wasm_dbg(base_addr as u64) };
+    let obj = load_witness_obj::<TestA, usize>(base_addr, |base| prepare_test_a(base, 10));
+    let v = unsafe { &*obj };
+    println!("test a is {:?}", v);
+}
+
+#[derive(WitnessObj, PartialEq, Clone, Debug)]
+struct TestB {
+    a: TestA,
+    c: Vec<u64>,
+    b: u64,
+}
+
+#[inline(never)]
+pub fn prepare_test_b(base: *const u8, a: i64) {
+    prepare_witness_obj(
+        base,
+        |x: &u64| {
+            let mut c = vec![];
+            for i in 0..2000 {
+                c.push(*x + (i as u64));
+            }
+            let a = TestA {
+                a: 1,
+                b: 2,
+                c: c.clone(),
+            };
+            TestB { a, b: 3, c }
+        },
+        &(a as u64),
+    );
+}
+
+pub fn test_witness_obj_test_b() {
+    let base_addr = alloc_witness_memory();
+    unsafe { wasm_dbg(base_addr as u64) };
+    let obj = load_witness_obj::<TestB, usize>(base_addr, |base| prepare_test_b(base, 0));
+    let v = unsafe { &*obj };
+    println!("test b is {:?}", v);
 }

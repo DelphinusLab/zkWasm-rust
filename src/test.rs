@@ -119,6 +119,8 @@ pub fn zkmain() -> i64 {
     }
     if true {
         super::witness::test_witness_obj();
+        super::witness::test_witness_obj_test_a();
+        super::witness::test_witness_obj_test_b();
     }
     let a = 0;
     super::dbg!("abc{}\n", a);
