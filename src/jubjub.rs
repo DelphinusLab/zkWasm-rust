@@ -2,9 +2,12 @@ use crate::babyjubjub_sum_finalize;
 use crate::babyjubjub_sum_new;
 use crate::babyjubjub_sum_push;
 use crate::require;
+use crate::WitnessObjReader;
+use crate::WitnessObjWriter;
+use derive_builder::WitnessObj;
 use primitive_types::U256;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, WitnessObj)]
 pub struct BabyJubjubPoint {
     pub x: U256,
     pub y: U256,
