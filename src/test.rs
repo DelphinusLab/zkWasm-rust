@@ -11,6 +11,7 @@ use crate::wasm_dbg;
 use primitive_types::U256;
 
 use crate::poseidon::PoseidonHasher;
+use crate::witness;
 use wasm_bindgen::prelude::*;
 
 pub fn test_merkle() {
@@ -118,9 +119,9 @@ pub fn zkmain() -> i64 {
         test_jubjub();
     }
     if true {
-        super::witness::test_witness_obj();
-        super::witness::test_witness_obj_test_a();
-        super::witness::test_witness_obj_test_b();
+        witness::test::test_witness_obj();
+        witness::test::test_witness_obj_test_a();
+        witness::test::test_witness_obj_test_b();
     }
     let a = 0;
     super::dbg!("abc{}\n", a);

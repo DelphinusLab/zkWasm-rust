@@ -1,5 +1,5 @@
 build:
-	wasm-pack build --release --out-name rust-sdk-test.wasm --out-dir pkg --features wasmbind
+	wasm-pack build --release --out-name rust-sdk-test.wasm --out-dir pkg --features zktest
 	wasm-opt -Oz -o pkg/output.wasm pkg/rust-sdk-test.wasm
 	cp pkg/rust-sdk-test.wasm pkg/output.wasm
 

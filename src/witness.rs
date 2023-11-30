@@ -2,18 +2,16 @@ extern "C" {
     /// inserts a witness at the current wasm_private inputs cursor
     pub fn wasm_witness_insert(u: u64);
     pub fn wasm_witness_pop() -> u64;
-    pub fn wasm_input(x: u32) -> u64;
-    pub fn require(cond: bool);
-    pub fn wasm_dbg(v: u64);
 }
 
+use crate::require;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::mem::size_of;
 use std::ptr::null_mut;
 
 static mut WITNESS_AREA: usize = 0;
 static mut WITNESS_AREA_END: usize = 0;
-const MAX_WITNESS_OBJ_SIZE: usize = 80 * 1024;
+const MAX_WITNESS_OBJ_SIZE: usize = 40 * 1024;
 const MAX_SUPPORTED_ALIGN: usize = 4096;
 
 static mut ALLOC_WITNESS: bool = false;
@@ -112,7 +110,6 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
     fn to_witness(&self, ori_base: *const u8, wit_base: *const u8) {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
         let arr_ptr = unsafe { wit_base.add((c[0] as *const u8).sub_ptr(ori_base)) };
-        let v = c[1];
         unsafe {
             wasm_witness_insert(arr_ptr as u64);
             wasm_witness_insert(c[1] as u64);
@@ -200,105 +197,111 @@ fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     obj
 }
 
-#[inline(never)]
-pub fn prepare_u64_vec(base: *const u8, a: i64) {
-    prepare_witness_obj(
-        base,
-        |x: &u64| {
-            let mut a = vec![];
-            for i in 0..2000 {
-                a.push(*x + (i as u64));
-            }
-            a
-        },
-        &(a as u64),
-    );
-}
+#[cfg(feature = "zktest")]
+pub(crate) mod test {
+    use super::load_witness_obj;
+    use super::prepare_witness_obj;
+    use super::WitnessObjReader;
+    use super::WitnessObjWriter;
+    use crate::alloc_witness_memory;
+    use crate::require;
+    use crate::wasm_dbg;
+    use derive_builder::WitnessObj;
 
-pub fn test_witness_obj() {
-    let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<Vec<u64>, u64>(base_addr, |base| prepare_u64_vec(base, 0));
-    let v = unsafe { &*obj };
-    for i in 0..100 {
-        unsafe {
-            //wasm_dbg(v[i]);
-            require(v[i] == (i as u64))
-        };
+    #[inline(never)]
+    pub fn prepare_u64_vec(base: *const u8, a: i64) {
+        prepare_witness_obj(
+            base,
+            |x: &u64| {
+                let mut a = vec![];
+                for i in 0..200 {
+                    a.push(*x + (i as u64));
+                }
+                a
+            },
+            &(a as u64),
+        );
     }
-}
 
-use derive_builder::WitnessObj;
+    pub fn test_witness_obj() {
+        let base_addr = alloc_witness_memory();
+        let obj = load_witness_obj::<Vec<u64>, u64>(base_addr, |base| prepare_u64_vec(base, 0));
+        let v = unsafe { &*obj };
+        for i in 0..100 {
+            unsafe { require(v[i] == (i as u64)) };
+        }
+    }
 
-#[derive(WitnessObj, PartialEq, Clone, Debug)]
-struct TestA {
-    a: u64,
-    b: u64,
-    c: Vec<u64>,
-}
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    struct TestA {
+        a: u64,
+        b: u64,
+        c: Vec<u64>,
+    }
 
-#[inline(never)]
-pub fn prepare_test_a(base: *const u8, a: i64) {
-    prepare_witness_obj(
-        base,
-        |x: &u64| {
-            let mut c = vec![];
-            for i in 0..10 {
-                c.push(*x + (i as u64));
-            }
-            TestA { a: 1, b: 2, c }
-        },
-        &(a as u64),
-    );
-}
-
-pub fn test_witness_obj_test_a() {
-    let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<TestA, usize>(base_addr, |base| prepare_test_a(base, 10));
-    let v = unsafe { &*obj };
-    super::dbg!("test a is {:?}\n", v);
-}
-
-#[derive(WitnessObj, PartialEq, Clone, Debug)]
-struct TestB {
-    a: Vec<TestA>,
-    c: Vec<u64>,
-    b: u64,
-}
-
-#[inline(never)]
-pub fn prepare_test_b(base: *const u8, a: i64) {
-    prepare_witness_obj(
-        base,
-        |x: &u64| {
-            let mut c = vec![];
-            let mut a_array = vec![];
-            for _ in 0..3 {
+    #[inline(never)]
+    pub fn prepare_test_a(base: *const u8, a: i64) {
+        prepare_witness_obj(
+            base,
+            |x: &u64| {
+                let mut c = vec![];
                 for i in 0..10 {
                     c.push(*x + (i as u64));
                 }
-                let a = TestA {
-                    a: 1,
-                    b: 2,
-                    c: c.clone(),
-                };
-                a_array.push(a);
-            }
-            TestB {
-                a: a_array,
-                b: 3,
-                c,
-            }
-        },
-        &(a as u64),
-    );
-}
+                TestA { a: 1, b: 2, c }
+            },
+            &(a as u64),
+        );
+    }
 
-pub fn test_witness_obj_test_b() {
-    let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<TestB, usize>(base_addr, |base| prepare_test_b(base, 0));
-    let v = unsafe { &*obj };
-    super::dbg!("test b is {:?}\n", v);
+    pub fn test_witness_obj_test_a() {
+        let base_addr = alloc_witness_memory();
+        unsafe { wasm_dbg(base_addr as u64) };
+        let obj = load_witness_obj::<TestA, usize>(base_addr, |base| prepare_test_a(base, 10));
+        let v = unsafe { &*obj };
+        crate::dbg!("test a is {:?}\n", v);
+    }
+
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    struct TestB {
+        a: Vec<TestA>,
+        c: Vec<u64>,
+        b: u64,
+    }
+
+    #[inline(never)]
+    pub fn prepare_test_b(base: *const u8, a: i64) {
+        prepare_witness_obj(
+            base,
+            |x: &u64| {
+                let mut c = vec![];
+                let mut a_array = vec![];
+                for _ in 0..3 {
+                    for i in 0..10 {
+                        c.push(*x + (i as u64));
+                    }
+                    let a = TestA {
+                        a: 1,
+                        b: 2,
+                        c: c.clone(),
+                    };
+                    a_array.push(a);
+                }
+                TestB {
+                    a: a_array,
+                    b: 3,
+                    c,
+                }
+            },
+            &(a as u64),
+        );
+    }
+
+    pub fn test_witness_obj_test_b() {
+        let base_addr = alloc_witness_memory();
+        unsafe { wasm_dbg(base_addr as u64) };
+        let obj = load_witness_obj::<TestB, usize>(base_addr, |base| prepare_test_b(base, 0));
+        let v = unsafe { &*obj };
+        crate::dbg!("test b is {:?}\n", v);
+    }
 }

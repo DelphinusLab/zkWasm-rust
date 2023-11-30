@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 witness = []
 wasmbind = ["witness"]
+zktest = ["wasmbind"]
 
 [dependencies]
 primitive-types = {version="0.12.1", default-features = false}
