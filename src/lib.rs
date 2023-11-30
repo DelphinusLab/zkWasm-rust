@@ -26,6 +26,7 @@ extern "C" {
 
 }
 
+pub mod allocator;
 pub mod jubjub;
 pub mod merkle;
 pub mod poseidon;
