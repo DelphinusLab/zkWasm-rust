@@ -151,7 +151,7 @@ impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
     }
 }
 
-fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
+pub fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     base: *const u8,
     gen: impl Fn(&T) -> Obj,
     t: &T,
@@ -165,7 +165,7 @@ fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     c.to_witness(ori_base, base);
 }
 
-fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
+pub fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
     base: *mut u8,
     prepare: impl FnOnce(*const u8),
 ) -> *const Obj {
@@ -192,7 +192,7 @@ fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
 }
 
 /// Load an object into wasm witness queue and restore it back to address start at (base: *mut 8)
-fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
+pub fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     base: *mut u8,
     prepare: impl FnOnce(*const u8),
 ) -> *const Obj {

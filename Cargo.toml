@@ -16,6 +16,7 @@ wasmbind = ["witness"]
 zktest = ["wasmbind"]
 
 [dependencies]
+cfg-if = "1.0.0"
 primitive-types = {version="0.12.1", default-features = false}
 wasm-bindgen = "0.2.83"
 derive_builder = { path = "./derive_builder" }

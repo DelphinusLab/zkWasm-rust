@@ -2,15 +2,34 @@ use crate::babyjubjub_sum_finalize;
 use crate::babyjubjub_sum_new;
 use crate::babyjubjub_sum_push;
 use crate::require;
-use crate::WitnessObjReader;
-use crate::WitnessObjWriter;
-use derive_builder::WitnessObj;
+cfg_if::cfg_if! {
+    if #[cfg(feature="witness")] {
+        use derive_builder::WitnessObj;
+        use crate::WitnessObjReader;
+        use crate::WitnessObjWriter;
+    } else {
+    }
+}
 use primitive_types::U256;
 
+cfg_if::cfg_if! {
+    if #[cfg(feature="witness")] {
 #[derive(Debug, Clone, PartialEq, WitnessObj)]
-pub struct BabyJubjubPoint {
-    pub x: U256,
-    pub y: U256,
+        pub struct BabyJubjubPoint {
+            pub x: U256,
+            pub y: U256,
+        }
+
+
+    } else {
+#[derive(Debug, Clone, PartialEq)]
+        pub struct BabyJubjubPoint {
+            pub x: U256,
+            pub y: U256,
+        }
+
+
+    }
 }
 
 pub const MODULUS: [u64; 4] = [
