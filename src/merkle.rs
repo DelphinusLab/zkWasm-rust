@@ -8,6 +8,7 @@ extern "C" {
     pub fn merkle_put_data(x: u64);
 }
 
+use crate::kvpair::SMT;
 use crate::poseidon::PoseidonHasher;
 use crate::require;
 
@@ -17,15 +18,17 @@ pub struct Merkle {
 
 #[derive(PartialEq)]
 pub struct Track {
-    pub last_index: u64,
+    pub last_index: u32,
     pub last_root: [u64; 4],
 }
 
 // track the last merkle_root of a merkle_get
 static mut LAST_TRACK: Option<Track> = None;
+// buf to receive max size of merkle leaf data node
+static mut DATA_NODE_BUF: [u64; 1024] = [0; 1024];
 
 impl Track {
-    pub fn set_track(root: &[u64; 4], index: u64) {
+    pub fn set_track(root: &[u64; 4], index: u32) {
         unsafe {
             LAST_TRACK = Some(Track {
                 last_root: root.clone(),
@@ -38,7 +41,7 @@ impl Track {
         unsafe { LAST_TRACK = None }
     }
 
-    pub fn tracked(root: &[u64; 4], index: u64) -> bool {
+    pub fn tracked(root: &[u64; 4], index: u32) -> bool {
         unsafe {
             LAST_TRACK
                 == Some(Track {
@@ -67,9 +70,9 @@ impl Merkle {
         Merkle { root }
     }
 
-    pub fn get_simple(&mut self, index: u64, data: &mut [u64; 4]) {
+    pub fn get_simple(&mut self, index: u32, data: &mut [u64; 4]) {
         unsafe {
-            merkle_address(index);
+            merkle_address(index as u64); // build in merkle address has default depth 32
 
             merkle_setroot(self.root[0]);
             merkle_setroot(self.root[1]);
@@ -90,13 +93,13 @@ impl Merkle {
         Track::set_track(&self.root, index);
     }
 
-    pub fn set_simple(&mut self, index: u64, data: &[u64; 4]) {
+    pub fn set_simple(&mut self, index: u32, data: &[u64; 4]) {
         // place a dummy get for merkle proof convension
         if Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
-                merkle_address(index);
+                merkle_address(index as u64);
 
                 merkle_setroot(self.root[0]);
                 merkle_setroot(self.root[1]);
@@ -117,7 +120,7 @@ impl Merkle {
         }
 
         unsafe {
-            merkle_address(index);
+            merkle_address(index as u64);
 
             merkle_setroot(self.root[0]);
             merkle_setroot(self.root[1]);
@@ -138,10 +141,10 @@ impl Merkle {
         Track::reset_track();
     }
 
-    pub fn get(&mut self, index: u64, data: &mut [u64], pad: bool) -> u64 {
+    pub fn get(&mut self, index: u32, data: &mut [u64], pad: bool) -> u64 {
         let mut hash = [0; 4];
         let len = unsafe {
-            merkle_address(index);
+            merkle_address(index as u64);
 
             merkle_setroot(self.root[0]);
             merkle_setroot(self.root[1]);
@@ -179,12 +182,12 @@ impl Merkle {
         len
     }
 
-    pub fn set(&mut self, index: u64, data: &[u64], pad: bool) {
+    pub fn set(&mut self, index: u32, data: &[u64], pad: bool) {
         if Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
-                merkle_address(index);
+                merkle_address(index as u64);
 
                 merkle_setroot(self.root[0]);
                 merkle_setroot(self.root[1]);
@@ -205,7 +208,7 @@ impl Merkle {
         }
 
         unsafe {
-            merkle_address(index);
+            merkle_address(index as u64);
 
             merkle_setroot(self.root[0]);
             merkle_setroot(self.root[1]);
@@ -228,5 +231,76 @@ impl Merkle {
             self.root[3] = merkle_getroot();
         };
         Track::reset_track();
+    }
+}
+
+const LEAF_NODE: u64 = 1;
+const TREE_NODE: u64 = 1;
+
+impl Merkle {
+    fn smt_get_local(
+        &mut self,
+        key: &[u64; 4],
+        path_index: usize,
+        data: &mut [u64],
+        pad: bool,
+    ) -> u64 {
+        unsafe { require(path_index < 8) };
+        let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
+        let len = self.get(local_index, data, pad);
+        unsafe { require(len > 1) };
+        if (data[0] & 0x1) == LEAF_NODE {
+            for i in 0..4 {
+                unsafe { require(data[i + 1] == key[i]) };
+            }
+            for i in 0..(len - 5) {
+                data[i as usize] = data[i as usize + 5]
+            }
+            return len - 5;
+        } else {
+            unsafe { require((data[0] & 0x1) == TREE_NODE) };
+            let mut sub_merkle = Merkle::load(data[1..4].to_vec().try_into().unwrap());
+            sub_merkle.smt_get_local(key, path_index + 1, data, pad)
+        }
+    }
+    fn smt_set_local(&mut self, key: &[u64; 4], path_index: usize, data: &[u64], pad: bool) {
+        unsafe { require(path_index < 8) };
+        let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
+        let node_buf = unsafe { DATA_NODE_BUF.as_mut_slice() };
+        let len = self.get(local_index, node_buf, pad);
+        unsafe { require(len > 1) };
+        if (node_buf[0] & 0x1) == LEAF_NODE {
+            for i in 0..4 {
+                unsafe { require(node_buf[i + 1] == key[i]) };
+            }
+            let data = Vec::with_capacity(1 + 4 + data.len());
+            let data = [[LEAF_NODE].to_vec(), key.to_vec(), data.to_vec()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+            self.set(local_index, data.as_slice(), pad);
+        } else {
+            unsafe { require((data[0] & 0x1) == TREE_NODE) };
+            let mut sub_merkle = Merkle::load(data[1..4].to_vec().try_into().unwrap());
+            sub_merkle.smt_set_local(key, path_index + 1, data, pad);
+            let new_data = [
+                TREE_NODE,
+                sub_merkle.root[0],
+                sub_merkle.root[1],
+                sub_merkle.root[2],
+                sub_merkle.root[3],
+            ];
+            self.set(local_index, new_data.as_slice(), pad);
+        }
+    }
+}
+
+impl SMT for Merkle {
+    fn smt_get(&mut self, key: &[u64; 4], data: &mut [u64], pad: bool) -> u64 {
+        self.smt_get_local(key, 0, data, pad)
+    }
+
+    fn smt_set(&mut self, key: &[u64; 4], data: &[u64], pad: bool) {
+        self.smt_set_local(key, 0, data, pad)
     }
 }
