@@ -6,6 +6,7 @@ extern "C" {
 
 use crate::jubjub::BabyJubjubPoint;
 use crate::jubjub::JubjubSignature;
+use crate::kvpair::KeyValueMap;
 use crate::merkle::Merkle;
 use crate::wasm_dbg;
 use primitive_types::U256;
@@ -56,6 +57,35 @@ pub fn test_merkle() {
 
     unsafe {
         require(leaf2 == [4, 5, 6, 7]);
+    }
+}
+
+pub fn test_kvpair() {
+    let merkle = Merkle::new();
+    let mut kvpair = KeyValueMap::new(merkle, true);
+    let key1 = [1, 2, 3, 4];
+    let key2 = [1, 5, 3, 4];
+    let mut data = [0, 0, 0, 0];
+
+    kvpair.set(&key1, &[1]);
+    let len = kvpair.get(&key1, &mut data);
+    unsafe {
+        require(len == 4);
+        require(data[0] == 1);
+    }
+
+    kvpair.set(&key2, &[2, 3]);
+    let len = kvpair.get(&key1, &mut data);
+    unsafe {
+        require(len == 1);
+        require(data[0] == 1);
+    }
+
+    let len = kvpair.get(&key2, &mut data);
+    unsafe {
+        require(len == 2);
+        require(data[0] == 2);
+        require(data[1] == 3);
     }
 }
 
@@ -116,6 +146,7 @@ pub fn zkmain() -> i64 {
     if true {
         test_merkle();
         test_jubjub();
+        test_kvpair();
     }
     if true {
         super::witness::test_witness_obj();

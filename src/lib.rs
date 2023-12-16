@@ -1,7 +1,4 @@
-#![cfg_attr(
-    feature = "witness",
-    feature(ptr_sub_ptr)
-)]
+#![cfg_attr(feature = "witness", feature(ptr_sub_ptr))]
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
@@ -30,6 +27,7 @@ extern "C" {
 }
 
 pub mod jubjub;
+pub mod kvpair;
 pub mod merkle;
 pub mod poseidon;
 
