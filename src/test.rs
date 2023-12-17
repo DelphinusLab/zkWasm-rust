@@ -65,27 +65,35 @@ pub fn test_kvpair() {
     let mut kvpair = KeyValueMap::new(merkle, true);
     let key1 = [1, 2, 3, 4];
     let key2 = [1, 5, 3, 4];
-    let mut data = [0, 0, 0, 0];
+    let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
+    crate::dbg!("set key1\n");
     kvpair.set(&key1, &[1]);
-    let len = kvpair.get(&key1, &mut data);
-    unsafe {
-        require(len == 4);
-        require(data[0] == 1);
-    }
-
-    kvpair.set(&key2, &[2, 3]);
-    let len = kvpair.get(&key1, &mut data);
+    crate::dbg!("set key1 done\n");
+    let len = kvpair.get(&key1, &mut data_buf);
+    crate::dbg!("got key1 {} \n", len);
     unsafe {
         require(len == 1);
-        require(data[0] == 1);
+        require(data_buf[0] == 1);
     }
 
-    let len = kvpair.get(&key2, &mut data);
+    crate::dbg!("set key2\n");
+    kvpair.set(&key2, &[2, 3]);
+    crate::dbg!("set key2 done\n");
+    let len = kvpair.get(&key1, &mut data_buf);
+    crate::dbg!("got key1 {} \n", len);
+    unsafe {
+        require(len == 1);
+        require(data_buf[0] == 1);
+    }
+
+    let len = kvpair.get(&key2, &mut data_buf);
+    crate::dbg!("got key2 {}\n", len);
+
     unsafe {
         require(len == 2);
-        require(data[0] == 2);
-        require(data[1] == 3);
+        require(data_buf[0] == 2);
+        require(data_buf[1] == 3);
     }
 }
 
@@ -144,7 +152,9 @@ pub fn test_jubjub() {
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
     if true {
+        crate::dbg!("testing merkle\n");
         test_merkle();
+        crate::dbg!("testing jubjub\n");
         test_jubjub();
         test_kvpair();
     }
