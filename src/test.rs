@@ -60,7 +60,12 @@ pub fn test_merkle() {
     }
 }
 
-fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64;4], data_buf: &mut [u64], data: &[u64]) {
+fn test_kvpair_value(
+    kvpair: &mut KeyValueMap<Merkle>,
+    key: &[u64; 4],
+    data_buf: &mut [u64],
+    data: &[u64],
+) {
     let len = kvpair.get(&key, data_buf);
     unsafe {
         require(len as usize == data.len());
@@ -75,7 +80,7 @@ pub fn test_kvpair() {
     let mut kvpair = KeyValueMap::new(merkle, true);
     let key1 = [1, 2, 3, 4];
     let key2 = [1, 5, 3, 4];
-    let key3 = [(1u64<<32) + 1, 5, 3, 4];
+    let key3 = [(1u64 << 32) + 1, 5, 3, 4];
 
     let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
@@ -93,7 +98,6 @@ pub fn test_kvpair() {
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
-
 }
 
 pub fn test_jubjub() {
@@ -155,12 +159,12 @@ pub fn zkmain() -> i64 {
         test_merkle();
         crate::dbg!("testing jubjub\n");
         test_jubjub();
+        crate::dbg!("testing kvpair\n");
         test_kvpair();
     }
     if true {
         super::witness::test_witness_obj();
     }
-    let a = 0;
-    super::dbg!("abc{}\n", a);
+    super::dbg!("test done\n");
     0
 }

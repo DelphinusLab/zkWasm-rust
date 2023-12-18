@@ -4,7 +4,6 @@ extern "C" {
     pub fn wasm_witness_pop() -> u64;
     pub fn wasm_input(x: u32) -> u64;
     pub fn require(cond: bool);
-    pub fn wasm_dbg(v: u64);
 }
 
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -211,13 +210,10 @@ pub fn prepare_u64_vec(base: *const u8, a: i64) {
 
 pub fn test_witness_obj() {
     let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
+    crate::dbg!("witness base addr is {:?}\n", base_addr);
     let obj = load_witness_obj::<Vec<u64>, u64>(base_addr, |base| prepare_u64_vec(base, 0));
     let v = unsafe { &*obj };
     for i in 0..100 {
-        unsafe {
-            //wasm_dbg(v[i]);
-            require(v[i] == (i as u64))
-        };
+        unsafe { require(v[i] == (i as u64)) };
     }
 }
