@@ -336,8 +336,9 @@ impl Merkle {
                 }
             } else {
                 // the node is already a sub merkle
-                unsafe { require((data[0] & 0x1) == TREE_NODE) };
-                let mut sub_merkle = Merkle::load(data[1..4].to_vec().try_into().unwrap());
+                crate::dbg!("current node for set is node:\n");
+                unsafe { require((node_buf[0] & 0x1) == TREE_NODE) };
+                let mut sub_merkle = Merkle::load(node_buf[1..5].to_vec().try_into().unwrap());
                 sub_merkle.smt_set_local(key, path_index + 1, data, pad);
                 let new_data = [
                     TREE_NODE,
@@ -346,7 +347,7 @@ impl Merkle {
                     sub_merkle.root[2],
                     sub_merkle.root[3],
                 ];
-                    self.set(local_index, new_data.as_slice(), pad);
+                self.set(local_index, new_data.as_slice(), pad);
             }
         }
     }
