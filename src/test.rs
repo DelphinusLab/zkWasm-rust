@@ -60,41 +60,40 @@ pub fn test_merkle() {
     }
 }
 
+fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64;4], data_buf: &mut [u64], data: &[u64]) {
+    let len = kvpair.get(&key, data_buf);
+    unsafe {
+        require(len as usize == data.len());
+        for i in 0..len as usize {
+            require(data_buf[i] == data[i]);
+        }
+    }
+}
+
 pub fn test_kvpair() {
     let merkle = Merkle::new();
     let mut kvpair = KeyValueMap::new(merkle, true);
     let key1 = [1, 2, 3, 4];
     let key2 = [1, 5, 3, 4];
+    let key3 = [(1u64<<32) + 1, 5, 3, 4];
+
     let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
-    crate::dbg!("set key1\n");
+    crate::dbg!("testing kvpair key1\n");
     kvpair.set(&key1, &[1]);
-    crate::dbg!("set key1 done\n");
-    let len = kvpair.get(&key1, &mut data_buf);
-    crate::dbg!("got key1 {} \n", len);
-    unsafe {
-        require(len == 1);
-        require(data_buf[0] == 1);
-    }
+    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
 
-    crate::dbg!("set key2\n");
+    crate::dbg!("testing kvpair key2 ...\n");
     kvpair.set(&key2, &[2, 3]);
-    crate::dbg!("set key2 done\n");
-    let len = kvpair.get(&key1, &mut data_buf);
-    crate::dbg!("got key1 {} \n", len);
-    unsafe {
-        require(len == 1);
-        require(data_buf[0] == 1);
-    }
+    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
 
-    let len = kvpair.get(&key2, &mut data_buf);
-    crate::dbg!("got key2 {}\n", len);
+    crate::dbg!("testing kvpair key2 ...\n");
+    kvpair.set(&key3, &[4, 5, 6]);
+    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
 
-    unsafe {
-        require(len == 2);
-        require(data_buf[0] == 2);
-        require(data_buf[1] == 3);
-    }
 }
 
 pub fn test_jubjub() {
