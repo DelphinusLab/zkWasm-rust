@@ -81,6 +81,9 @@ pub fn test_kvpair() {
     let key1 = [1, 2, 3, 4];
     let key2 = [1, 5, 3, 4];
     let key3 = [(1u64 << 32) + 1, 5, 3, 4];
+    let key4 = [1, 5, 3, 5];
+    let key5 = [1, 5, 3, (2u64 << 32) + 5];
+    let key6 = [1, 5, 4, (2u64 << 32) + 5];
 
     let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
@@ -98,6 +101,24 @@ pub fn test_kvpair() {
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
+
+    crate::dbg!("testing kvpair key2 ...\n");
+    kvpair.set(&key4, &[7]);
+    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
+    test_kvpair_value(&mut kvpair, &key4, &mut data_buf, &[7]);
+
+    crate::dbg!("testing kvpair key5 ...\n");
+    kvpair.set(&key5, &[8, 9]);
+    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
+    test_kvpair_value(&mut kvpair, &key4, &mut data_buf, &[7]);
+    test_kvpair_value(&mut kvpair, &key5, &mut data_buf, &[8, 9]);
+
+    let len = kvpair.get(&key6, &mut data_buf);
+    unsafe { require(len == 0) };
 }
 
 pub fn test_jubjub() {
