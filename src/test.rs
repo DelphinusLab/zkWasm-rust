@@ -31,6 +31,7 @@ pub fn test_merkle() {
     let mut merkle = Merkle::new();
     let mut leaf = [0, 0, 0, 0];
 
+    crate::dbg!("testing merkle set 1, index: 0\n");
     merkle.set(0, &[1, 1, 2, 2], false);
 
     let len = merkle.get(0, &mut leaf, false);
@@ -40,6 +41,7 @@ pub fn test_merkle() {
         require(leaf == [1, 1, 2, 2]);
     }
 
+    crate::dbg!("testing merkle set 2, index: 0\n");
     merkle.set(0, &[3, 4, 5, 6, 7], true);
     let mut leaf = [0, 0, 0, 0, 0];
 
@@ -50,6 +52,8 @@ pub fn test_merkle() {
         require(leaf == [3, 4, 5, 6, 7]);
     }
 
+
+    crate::dbg!("testing merkle set simple, index: 1\n");
     merkle.set_simple(1, &[4, 5, 6, 7]);
     let mut leaf2 = [0, 0, 0, 0];
 
@@ -96,13 +100,13 @@ pub fn test_kvpair() {
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
 
-    crate::dbg!("testing kvpair key2 ...\n");
+    crate::dbg!("testing kvpair key3 ...\n");
     kvpair.set(&key3, &[4, 5, 6]);
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
 
-    crate::dbg!("testing kvpair key2 ...\n");
+    crate::dbg!("testing kvpair key4 ...\n");
     kvpair.set(&key4, &[7]);
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);

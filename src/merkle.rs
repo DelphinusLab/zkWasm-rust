@@ -4,13 +4,12 @@ extern "C" {
     pub fn merkle_set(x: u64);
     pub fn merkle_get() -> u64;
     pub fn merkle_getroot() -> u64;
-    pub fn merkle_fetch_data() -> u64;
-    pub fn merkle_put_data(x: u64);
 }
 
 use crate::kvpair::SMT;
 use crate::poseidon::PoseidonHasher;
 use crate::require;
+use crate::cache;
 
 pub struct Merkle {
     pub root: [u64; 4],
@@ -62,10 +61,10 @@ impl Merkle {
     pub fn new() -> Self {
         //THE following is the depth=31, 32 level merkle root default
         let root = [
-            5647113874217112664,
-            14689602159481241585,
-            4257643359784105407,
-            2925219336634521956,
+            14789582351289948625,
+            10919489180071018470,
+            10309858136294505219,
+            2839580074036780766
         ];
         Merkle { root }
     }
@@ -143,94 +142,25 @@ impl Merkle {
 
     pub fn get(&mut self, index: u32, data: &mut [u64], pad: bool) -> u64 {
         let mut hash = [0; 4];
-        let len = unsafe {
-            merkle_address(index as u64);
-
-            merkle_setroot(self.root[0]);
-            merkle_setroot(self.root[1]);
-            merkle_setroot(self.root[2]);
-            merkle_setroot(self.root[3]);
-
-            hash[0] = merkle_get();
-            hash[1] = merkle_get();
-            hash[2] = merkle_get();
-            hash[3] = merkle_get();
-
-            //enforce root does not change
-            merkle_getroot();
-            merkle_getroot();
-            merkle_getroot();
-            merkle_getroot();
-
-            let len = merkle_fetch_data();
-            if len > 0 {
-                require(len <= data.len() as u64);
-                for i in 0..len {
-                    data[i as usize] = merkle_fetch_data();
-                }
-
-                // FIXME: avoid copy here
-                let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
+        self.get_simple(index, &mut hash);
+        let len = cache::fetch_data(&hash, data);
+        if len > 0 {
+            // FIXME: avoid copy here
+            let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
+            unsafe {
                 require(hash[0] == hash_check[0]);
                 require(hash[1] == hash_check[1]);
                 require(hash[2] == hash_check[2]);
                 require(hash[3] == hash_check[3]);
             }
-            len
-        };
-        Track::set_track(&self.root, index);
+        }
         len
     }
 
     pub fn set(&mut self, index: u32, data: &[u64], pad: bool) {
-        if Track::tracked(&self.root, index) {
-            ()
-        } else {
-            unsafe {
-                merkle_address(index as u64);
-
-                merkle_setroot(self.root[0]);
-                merkle_setroot(self.root[1]);
-                merkle_setroot(self.root[2]);
-                merkle_setroot(self.root[3]);
-
-                merkle_get();
-                merkle_get();
-                merkle_get();
-                merkle_get();
-
-                //enforce root does not change
-                merkle_getroot();
-                merkle_getroot();
-                merkle_getroot();
-                merkle_getroot();
-            }
-        }
-
-        unsafe {
-            merkle_address(index as u64);
-
-            merkle_setroot(self.root[0]);
-            merkle_setroot(self.root[1]);
-            merkle_setroot(self.root[2]);
-            merkle_setroot(self.root[3]);
-
-            for d in data.iter() {
-                merkle_put_data(*d);
-            }
-
-            let hash = PoseidonHasher::hash(data, pad);
-            merkle_set(hash[0]);
-            merkle_set(hash[1]);
-            merkle_set(hash[2]);
-            merkle_set(hash[3]);
-
-            self.root[0] = merkle_getroot();
-            self.root[1] = merkle_getroot();
-            self.root[2] = merkle_getroot();
-            self.root[3] = merkle_getroot();
-        };
-        Track::reset_track();
+        let hash = PoseidonHasher::hash(data, pad);
+        cache::store_data(&hash, data);
+        self.set_simple(index, &hash);
     }
 }
 
@@ -334,6 +264,7 @@ impl Merkle {
                     self.set(local_index, &node_buf[0..5], pad);
                 }
             } else {
+                //crate::dbg!("current node for set is node:\n");
                 // the node is already a sub merkle
                 unsafe { require((node_buf[0] & 0x1) == TREE_NODE) };
                 let mut sub_merkle = Merkle::load(node_buf[1..5].try_into().unwrap());
