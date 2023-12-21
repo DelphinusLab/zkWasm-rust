@@ -153,6 +153,13 @@ impl Merkle {
                 require(hash[2] == hash_check[2]);
                 require(hash[3] == hash_check[3]);
             }
+        } else {
+            unsafe {
+                require(hash[0] == 0);
+                require(hash[1] == 0);
+                require(hash[2] == 0);
+                require(hash[3] == 0);
+            }
         }
         len
     }
