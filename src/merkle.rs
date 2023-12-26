@@ -176,13 +176,19 @@ const TREE_NODE: u64 = 1;
 
 // internal func: key must have length 4
 fn data_matches_key(data: &[u64], key: &[u64]) -> bool {
-    // data[0] == LEAF_NODE
+    // Recall that data[0] == LEAF_NODE
+    data[1] == key[0] &&
+    data[2] == key[1] &&
+    data[3] == key[2] &&
+    data[4] == key[3]
+    /*
     for i in 0..4 {
         if data[i + 1] != key[i] {
             return false;
         };
     }
     return true;
+    */
 }
 
 // using a static buf to avoid memory allocation in smt implementation
