@@ -94,7 +94,12 @@ pub fn test_kvpair() {
     let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
     crate::dbg!("testing kvpair key1\n");
+    crate::dbg!("trace size is \n");
+    let trace_size = unsafe { wasm_trace_size() };
+    unsafe { crate::wasm_dbg(trace_size); }
     kvpair.set(&key1, &[1]);
+    let delta_size = unsafe { wasm_trace_size() - trace_size };
+    crate::dbg!("trace size is {}\n", delta_size);
     test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
 
     crate::dbg!("testing kvpair key2 ...\n");
@@ -119,6 +124,7 @@ pub fn test_kvpair() {
     kvpair.set(&key5, &[8, 9]);
     //kvpair.set(&key1, &[5]);
     let trace_size = unsafe { wasm_trace_size() };
+    crate::dbg!("testing set cost ...\n");
     kvpair.set(&key1, &[6]);
     let delta_size = unsafe { wasm_trace_size() - trace_size };
     crate::dbg!("delta size is {}\n", delta_size);

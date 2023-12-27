@@ -24,6 +24,7 @@ extern "C" {
     pub fn babyjubjub_sum_push(x: u64);
     pub fn babyjubjub_sum_finalize() -> u64;
 
+    pub fn wasm_trace_size() -> u64;
 }
 
 pub mod jubjub;

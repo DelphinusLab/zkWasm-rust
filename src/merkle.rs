@@ -10,6 +10,7 @@ use crate::kvpair::SMT;
 use crate::poseidon::PoseidonHasher;
 use crate::require;
 use crate::cache;
+use crate::wasm_trace_size;
 
 pub struct Merkle {
     pub root: [u64; 4],
@@ -42,11 +43,16 @@ impl Track {
 
     pub fn tracked(root: &[u64; 4], index: u32) -> bool {
         unsafe {
-            LAST_TRACK
-                == Some(Track {
-                    last_root: root.clone(),
-                    last_index: index,
-                })
+            match &LAST_TRACK {
+                Some(track) => {
+                    track.last_root[0] == root[0] &&
+                        track.last_root[1] == root[1] &&
+                        track.last_root[2] == root[2] &&
+                        track.last_root[3] == root[3] &&
+                        track.last_index == index
+                },
+                _=> false
+            }
         }
     }
 }
@@ -165,9 +171,14 @@ impl Merkle {
     }
 
     pub fn set(&mut self, index: u32, data: &[u64], pad: bool) {
+        let trace = unsafe { crate::wasm_trace_size() };
         let hash = PoseidonHasher::hash(data, pad);
+        let delta1 = unsafe { crate::wasm_trace_size() - trace };
         cache::store_data(&hash, data);
+        let delta2 = unsafe { crate::wasm_trace_size() - trace };
         self.set_simple(index, &hash);
+        let delta3 = unsafe { crate::wasm_trace_size() - trace };
+        //crate::dbg!("diff {} {} {}\n", delta1, delta2, delta3);
     }
 }
 
@@ -198,9 +209,11 @@ fn set_smt_data(node_buf: &mut [u64], t: u64, key: &[u64], data: &[u64]) {
     node_buf[2] = key[1];
     node_buf[3] = key[2];
     node_buf[4] = key[3];
+    unsafe{crate::wasm_dbg(crate::wasm_trace_size())};
     for i in 0..data.len() {
         node_buf[5 + i] = data[i];
     }
+    unsafe{crate::wasm_dbg(crate::wasm_trace_size())};
 }
 
 impl Merkle {
@@ -248,18 +261,24 @@ impl Merkle {
         if len == 0 {
             let data_len = data.len();
             //crate::dbg!("smt set local not hit update data {}:\n", data_len);
+            unsafe{crate::wasm_dbg(crate::wasm_trace_size())};
             set_smt_data(node_buf, LEAF_NODE, key, data);
+            unsafe{crate::wasm_dbg(crate::wasm_trace_size())};
             self.set(local_index, &node_buf[0..5 + data_len], pad);
+            unsafe{crate::wasm_dbg(crate::wasm_trace_size())};
         } else {
             //crate::dbg!("smt set local hit:\n");
             if (node_buf[0] & 0x1) == LEAF_NODE {
                 //crate::dbg!("current node for set is leaf:\n");
                 if data_matches_key(node_buf, key) {
+                    let trace = unsafe {wasm_trace_size()};
                     let data_len = data.len();
                     //crate::dbg!("key match update data {}:\n", data_len);
                     // if hit the current node
                     set_smt_data(node_buf, LEAF_NODE, key, data);
                     self.set(local_index, &node_buf[0..5 + data_len], pad);
+                    let delta = unsafe {wasm_trace_size() - trace};
+                    //crate::dbg!("delta size of set local last hit is {}\n", delta);
                 } else {
                     //crate::dbg!("key not match, creating sub node:\n");
                     // conflict of key here

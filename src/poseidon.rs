@@ -18,15 +18,13 @@ impl PoseidonHasher {
             let mut j = 0;
             for i in 0..group {
                 j = i * 3;
-                hasher.update(data[j]);
-                hasher.update(data[j + 1]);
-                hasher.update(data[j + 2]);
-                hasher.update(0u64);
+                hasher.update_pad_field(&data[j..j+3]);
             }
             j += 3;
             for i in j..data.len() {
                 hasher.update(data[i]);
             }
+            let len = data.len();
         } else {
             for d in data {
                 hasher.update(*d);
@@ -34,6 +32,28 @@ impl PoseidonHasher {
         }
         hasher.finalize()
     }
+
+    // for better trace size
+    fn update_pad_field(&mut self, v: &[u64]) {
+        unsafe {
+            poseidon_push(v[0]);
+            poseidon_push(v[1]);
+            poseidon_push(v[2]);
+            poseidon_push(0u64);
+        }
+        self.0 += 4;
+        if self.0 == 32 {
+            unsafe {
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_finalize();
+                poseidon_new(0u64);
+            }
+            self.0 = 0;
+        }
+    }
+
     pub fn update(&mut self, v: u64) {
         unsafe {
             poseidon_push(v);
