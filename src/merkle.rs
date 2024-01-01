@@ -15,41 +15,8 @@ pub struct Merkle {
     pub root: [u64; 4],
 }
 
-#[derive(PartialEq)]
-pub struct Track {
-    pub last_index: u32,
-    pub last_root: [u64; 4],
-}
-
-// track the last merkle_root of a merkle_get
-static mut LAST_TRACK: Option<Track> = None;
 // buf to receive max size of merkle leaf data node
 static mut DATA_NODE_BUF: [u64; 1024] = [0; 1024];
-
-impl Track {
-    pub fn set_track(root: &[u64; 4], index: u32) {
-        unsafe {
-            LAST_TRACK = Some(Track {
-                last_root: root.clone(),
-                last_index: index,
-            })
-        }
-    }
-
-    pub fn reset_track() {
-        unsafe { LAST_TRACK = None }
-    }
-
-    pub fn tracked(root: &[u64; 4], index: u32) -> bool {
-        unsafe {
-            LAST_TRACK
-                == Some(Track {
-                    last_root: root.clone(),
-                    last_index: index,
-                })
-        }
-    }
-}
 
 impl Merkle {
     /// New Merkle with initial root hash
@@ -69,6 +36,7 @@ impl Merkle {
         Merkle { root }
     }
 
+    /// Get the raw leaf data of a merkle subtree
     pub fn get_simple(&mut self, index: u32, data: &mut [u64; 4]) {
         unsafe {
             merkle_address(index as u64); // build in merkle address has default depth 32
@@ -89,36 +57,12 @@ impl Merkle {
             merkle_getroot();
             merkle_getroot();
         }
-        Track::set_track(&self.root, index);
     }
 
-    pub fn set_simple(&mut self, index: u32, data: &[u64; 4]) {
-        // place a dummy get for merkle proof convension
-        if Track::tracked(&self.root, index) {
-            ()
-        } else {
-            unsafe {
-                merkle_address(index as u64);
-
-                merkle_setroot(self.root[0]);
-                merkle_setroot(self.root[1]);
-                merkle_setroot(self.root[2]);
-                merkle_setroot(self.root[3]);
-
-                merkle_get();
-                merkle_get();
-                merkle_get();
-                merkle_get();
-
-                //enforce root does not change
-                merkle_getroot();
-                merkle_getroot();
-                merkle_getroot();
-                merkle_getroot();
-            }
-        }
-
+    /// Set the raw leaf data of a merkle subtree but does enforced the get/set pair convention
+    pub unsafe fn set_simple_unsafe(&mut self, index: u32, data: &[u64; 4]) {
         unsafe {
+            // perform the set
             merkle_address(index as u64);
 
             merkle_setroot(self.root[0]);
@@ -136,13 +80,63 @@ impl Merkle {
             self.root[2] = merkle_getroot();
             self.root[3] = merkle_getroot();
         }
-
-        Track::reset_track();
     }
 
-    pub fn get(&mut self, index: u32, data: &mut [u64], pad: bool) -> u64 {
-        let mut hash = [0; 4];
-        self.get_simple(index, &mut hash);
+
+    /// Set the raw leaf data of a merkle subtree
+    pub fn set_simple(&mut self, index: u32, data: &[u64; 4], hint: Option<&[u64; 4]>) {
+        // place a dummy get for merkle proof convension
+        unsafe {
+                merkle_address(index as u64);
+                merkle_setroot(self.root[0]);
+                merkle_setroot(self.root[1]);
+                merkle_setroot(self.root[2]);
+                merkle_setroot(self.root[3]);
+        }
+        if let Some(hint_data) = hint {
+            unsafe {
+                require(hint_data[0] == merkle_get());
+                require(hint_data[1] == merkle_get());
+                require(hint_data[2] == merkle_get());
+                require(hint_data[3] == merkle_get());
+            }
+        } else {
+            unsafe {
+                merkle_get();
+                merkle_get();
+                merkle_get();
+                merkle_get();
+            }
+        }
+        unsafe {
+            //enforce root does not change
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+            merkle_getroot();
+
+            // perform the set
+            merkle_address(index as u64);
+
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
+
+            merkle_set(data[0]);
+            merkle_set(data[1]);
+            merkle_set(data[2]);
+            merkle_set(data[3]);
+
+            self.root[0] = merkle_getroot();
+            self.root[1] = merkle_getroot();
+            self.root[2] = merkle_getroot();
+            self.root[3] = merkle_getroot();
+        }
+    }
+
+    pub fn get(&mut self, index: u32, data: &mut [u64], hash: &mut [u64; 4], pad: bool) -> u64 {
+        self.get_simple(index, hash);
         let len = cache::fetch_data(&hash, data);
         if len > 0 {
             // FIXME: avoid copy here
@@ -164,11 +158,20 @@ impl Merkle {
         len
     }
 
-    pub fn set(&mut self, index: u32, data: &[u64], pad: bool) {
+    /// safe version of set which enforces a get before set
+    pub fn set(&mut self, index: u32, data: &[u64], pad: bool, hint: Option<&[u64; 4]>) {
         let hash = PoseidonHasher::hash(data, pad);
         cache::store_data(&hash, data);
-        self.set_simple(index, &hash);
+        self.set_simple(index, &hash, hint);
     }
+
+    /// unsafe version of set which does not enforce the get/set pair convention
+    pub unsafe fn set_unsafe(&mut self, index: u32, data: &[u64], pad: bool) {
+        let hash = PoseidonHasher::hash(data, pad);
+        cache::store_data(&hash, data);
+        self.set_simple_unsafe(index, &hash);
+    }
+
 }
 
 const LEAF_NODE: u64 = 0;
@@ -209,12 +212,13 @@ impl Merkle {
         key: &[u64; 4],
         path_index: usize,
         data: &mut [u64],
-        pad: bool,
     ) -> u64 {
         //crate::dbg!("start smt_get_local {}\n", path_index);
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
-        let len = self.get(local_index, data, pad);
+        let mut hash = [0; 4];
+        // pad is true since the leaf might the root of a sub merkle
+        let len = self.get(local_index, data, &mut hash,true);
         if len == 0 {
             // no node was find
             return 0;
@@ -235,21 +239,24 @@ impl Merkle {
                 //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
                 unsafe { require((data[0] & 0x1) == TREE_NODE) };
                 let mut sub_merkle = Merkle::load(data[1..5].try_into().unwrap());
-                sub_merkle.smt_get_local(key, path_index + 1, data, pad)
+                sub_merkle.smt_get_local(key, path_index + 1, data)
             }
         }
     }
 
-    fn smt_set_local(&mut self, key: &[u64], path_index: usize, data: &[u64], pad: bool) {
+    fn smt_set_local(&mut self, key: &[u64], path_index: usize, data: &[u64]) {
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
         let node_buf = unsafe { DATA_NODE_BUF.as_mut_slice() };
-        let len = self.get(local_index, node_buf, pad);
+        let mut hint_hash = [0; 4];
+        let len = self.get(local_index, node_buf, &mut hint_hash, true);
         if len == 0 {
             let data_len = data.len();
             //crate::dbg!("smt set local not hit update data {}:\n", data_len);
             set_smt_data(node_buf, LEAF_NODE, key, data);
-            self.set(local_index, &node_buf[0..5 + data_len], pad);
+            unsafe {
+                self.set_unsafe(local_index, &node_buf[0..5 + data_len], true);
+            }
         } else {
             //crate::dbg!("smt set local hit:\n");
             if (node_buf[0] & 0x1) == LEAF_NODE {
@@ -259,7 +266,9 @@ impl Merkle {
                     //crate::dbg!("key match update data {}:\n", data_len);
                     // if hit the current node
                     set_smt_data(node_buf, LEAF_NODE, key, data);
-                    self.set(local_index, &node_buf[0..5 + data_len], pad);
+                    unsafe {
+                        self.set_unsafe(local_index, &node_buf[0..5 + data_len], true);
+                    }
                 } else {
                     //crate::dbg!("key not match, creating sub node:\n");
                     // conflict of key here
@@ -269,32 +278,32 @@ impl Merkle {
                         &node_buf[1..5],
                         path_index + 1,
                         &node_buf[5..len as usize],
-                        pad,
                     );
-                    sub_merkle.smt_set_local(key, path_index + 1, data, pad);
+                    sub_merkle.smt_set_local(key, path_index + 1, data);
                     set_smt_data(node_buf, TREE_NODE, sub_merkle.root.as_slice(), &[]);
                     // 2 update the current node with the sub merkle tree
-                    self.set(local_index, &node_buf[0..5], pad);
+                    // OPT: shoulde be able to use the hint_hash in the future
+                    self.set(local_index, &node_buf[0..5], true, None);
                 }
             } else {
                 //crate::dbg!("current node for set is node:\n");
                 // the node is already a sub merkle
                 unsafe { require((node_buf[0] & 0x1) == TREE_NODE) };
                 let mut sub_merkle = Merkle::load(node_buf[1..5].try_into().unwrap());
-                sub_merkle.smt_set_local(key, path_index + 1, data, pad);
+                sub_merkle.smt_set_local(key, path_index + 1, data);
                 set_smt_data(node_buf, TREE_NODE, sub_merkle.root.as_slice(), &[]);
-                self.set(local_index, &node_buf[0..5], pad);
+                self.set(local_index, &node_buf[0..5], true, None);
             }
         }
     }
 }
 
 impl SMT for Merkle {
-    fn smt_get(&mut self, key: &[u64; 4], data: &mut [u64], pad: bool) -> u64 {
-        self.smt_get_local(key, 0, data, pad)
+    fn smt_get(&mut self, key: &[u64; 4], data: &mut [u64]) -> u64 {
+        self.smt_get_local(key, 0, data)
     }
 
-    fn smt_set(&mut self, key: &[u64; 4], data: &[u64], pad: bool) {
-        self.smt_set_local(key, 0, data, pad)
+    fn smt_set(&mut self, key: &[u64; 4], data: &[u64]) {
+        self.smt_set_local(key, 0, data)
     }
 }

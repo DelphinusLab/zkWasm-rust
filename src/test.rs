@@ -9,7 +9,6 @@ use crate::jubjub::BabyJubjubPoint;
 use crate::jubjub::JubjubSignature;
 use crate::kvpair::KeyValueMap;
 use crate::merkle::Merkle;
-use crate::wasm_dbg;
 use primitive_types::U256;
 
 use crate::poseidon::PoseidonHasher;
@@ -21,21 +20,15 @@ pub fn test_merkle() {
     for d in data {
         hasher.update(d);
     }
-    let z = hasher.finalize();
-    unsafe { wasm_dbg(z[0]) };
-    /*
-    unsafe {
-        require(z[0] == 1);
-    }
-    */
+    hasher.finalize();
 
     let mut merkle = Merkle::new();
     let mut leaf = [0, 0, 0, 0];
 
     crate::dbg!("testing merkle set 1, index: 0\n");
-    merkle.set(0, &[1, 1, 2, 2], false);
+    merkle.set(0, &[1, 1, 2, 2], false, None);
 
-    let len = merkle.get(0, &mut leaf, false);
+    let len = merkle.get(0, &mut leaf, &mut [0; 4], false);
 
     unsafe {
         require(len == 4);
@@ -43,10 +36,10 @@ pub fn test_merkle() {
     }
 
     crate::dbg!("testing merkle set 2, index: 0\n");
-    merkle.set(0, &[3, 4, 5, 6, 7], true);
+    merkle.set(0, &[3, 4, 5, 6, 7], true, None);
     let mut leaf = [0, 0, 0, 0, 0];
 
-    let len = merkle.get(0, &mut leaf, true);
+    let len = merkle.get(0, &mut leaf, &mut [0; 4], true);
 
     unsafe {
         require(len == 5);
@@ -55,7 +48,7 @@ pub fn test_merkle() {
 
 
     crate::dbg!("testing merkle set simple, index: 1\n");
-    merkle.set_simple(1, &[4, 5, 6, 7]);
+    merkle.set_simple(1, &[4, 5, 6, 7], None);
     let mut leaf2 = [0, 0, 0, 0];
 
     merkle.get_simple(1, &mut leaf2);
@@ -82,7 +75,7 @@ fn test_kvpair_value(
 
 pub fn test_kvpair() {
     let merkle = Merkle::new();
-    let mut kvpair = KeyValueMap::new(merkle, true);
+    let mut kvpair = KeyValueMap::new(merkle);
     let key1 = [1, 2, 3, 4];
     let key2 = [1, 5, 3, 4];
     let key3 = [(1u64 << 32) + 1, 5, 3, 4];
