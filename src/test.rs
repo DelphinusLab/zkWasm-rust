@@ -127,20 +127,28 @@ pub fn test_kvpair() {
 pub fn test_kvpair_u64() {
     let merkle = Merkle::new();
     let mut kvpair = KeyValueMapU64::new(merkle);
-    for i in 0..64 {
-        let key = i * 0xffffffffu64;
-        let data = i;
-        kvpair.set(key, data);
+    let count = 4;
+    for i in 0..count {
+        for j in 0..count {
+            crate::dbg!("fill {} {}\n", i, j);
+            let key = i + (j<<32);
+            let data = i * 16 + j;
+            kvpair.set(key, data);
+            crate::dbg!("fill done {} {}\n", i, j);
+        }
     }
 
-    for i in 0..64 {
-        let key = i * 0xffffffffu64;
-        let data = i;
-        let data_in = kvpair.get(key);
-        if data != data_in {
-            crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
+    for i in 0..count {
+        for j in 0..count {
+            crate::dbg!("test {} {}", i, j);
+            let key = i + (j<<32);
+            let data = i * 16 + j;
+            let data_in = kvpair.get(key);
+            if data != data_in {
+                crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
+            }
+            unsafe { require(data == data_in) };
         }
-        unsafe { require(data == data_in) };
     }
 }
 

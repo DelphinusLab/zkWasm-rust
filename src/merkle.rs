@@ -283,6 +283,19 @@ impl SMT for Merkle {
     }
 }
 
+const IS_NODE_BIT: u64 = 0b1000000 << 56;
+const IS_EMPTY_BIT: u64 = 0b100000 << 56;
+
+fn is_leaf(a: u64) -> bool {
+    (a & IS_NODE_BIT) == 0
+}
+
+fn is_empty(a: u64) -> bool {
+    (a & IS_EMPTY_BIT) == 0
+}
+
+
+
 impl Merkle {
     // optimized version for
     fn smt_get_local_u64(&mut self, key: u64, path_index: usize) -> u64 {
@@ -293,12 +306,12 @@ impl Merkle {
         let mut stored_data = [0; 4];
         self.get_simple(local_index, &mut stored_data);
         // data is stored in little endian
-        let mode = ((stored_data[3] & 0b10000000) >> 7) as u64;
-        if mode == LEAF_NODE {
+        let is_leaf = is_leaf(stored_data[3]);
+        if is_leaf {
             // second highest bit indicates the leaf node is empty or not
-            let not_empty = (stored_data[3] & 0b1000000) >> 6;
+            let is_empty = is_empty(stored_data[3]);
             let stored_key = stored_data[0];
-            if (not_empty == 1) && key == stored_key {
+            if (!is_empty) && key == stored_key {
                 return stored_data[1];
             } else {
                 // is empty or not hit
@@ -309,8 +322,8 @@ impl Merkle {
             unsafe {
                 crate::require(path_index == 0);
             }
-            //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
-            stored_data[3] = stored_data[3] & 0b01111111;
+            crate::dbg!("smt_get_local is node: continue in sub merkle\n");
+            stored_data[3] = stored_data[3] & !IS_NODE_BIT;
             let mut sub_merkle = Merkle::load(stored_data);
             sub_merkle.smt_get_local_u64(key, path_index + 1)
         }
@@ -318,15 +331,16 @@ impl Merkle {
 
     fn smt_set_local_u64(&mut self, key: u64, path_index: usize, data: u64) {
         unsafe { require(path_index < 2) };
-        let local_index = (key >> (32 * (path_index % 2))) as u32;
+        let local_index = (key >> (32 * path_index)) as u32;
         let mut stored_data = [0; 4];
         self.get_simple(local_index, &mut stored_data);
-        let mode = ((stored_data[3] & 0b10000000) >> 7) as u64;
+        let is_leaf = is_leaf(stored_data[3]);
 
-        if mode == LEAF_NODE {
-            let not_empty = (stored_data[3] & 0b1000000) >> 6;
-            if not_empty == 0 {
-                self.set_simple(local_index, &[key, data, 0, 0b01000000], None);
+        // LEAF_NODE must equal zero
+        if is_leaf {
+            let is_empty = is_empty(stored_data[3]);
+            if is_empty {
+                self.set_simple(local_index, &[key, data, 0, IS_EMPTY_BIT], None);
             } else {
                 crate::dbg!("smt set local hit:\n");
                 if key == stored_data[0] {
@@ -342,7 +356,8 @@ impl Merkle {
                     sub_merkle.smt_set_local_u64(stored_data[0], path_index + 1, stored_data[1]);
                     sub_merkle.smt_set_local_u64(key, path_index + 1, data);
                     stored_data = sub_merkle.root;
-                    stored_data[3] = stored_data[3] | 0b10000000;
+                    stored_data[3] = stored_data[3] | IS_NODE_BIT;
+                    crate::dbg!("hash is {:?}\n", stored_data);
                     // 2 update the current node with the sub merkle tree
                     self.set_simple(local_index, &stored_data, None);
                 }
@@ -354,10 +369,11 @@ impl Merkle {
             unsafe {
                 crate::require(path_index == 0);
             }
-            stored_data[3] = stored_data[3] & 0b01111111;
+            stored_data[3] = stored_data[3] & !IS_NODE_BIT;
+            crate::dbg!("fetch hash is {:?}\n", stored_data);
             let mut sub_merkle = Merkle::load(stored_data);
             sub_merkle.smt_set_local_u64(key, path_index + 1, data);
-            sub_merkle.root[3] = sub_merkle.root[3] | 0b10000000;
+            sub_merkle.root[3] = sub_merkle.root[3] | IS_NODE_BIT;
             self.set_simple(local_index, &sub_merkle.root, None);
         }
     }
