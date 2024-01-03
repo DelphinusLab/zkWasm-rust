@@ -6,10 +6,10 @@ extern "C" {
     pub fn merkle_getroot() -> u64;
 }
 
-use crate::kvpair::SMT;
+use crate::cache;
+use crate::kvpair::{SMT, SMTU64};
 use crate::poseidon::PoseidonHasher;
 use crate::require;
-use crate::cache;
 
 pub struct Merkle {
     pub root: [u64; 4],
@@ -31,7 +31,7 @@ impl Merkle {
             14789582351289948625,
             10919489180071018470,
             10309858136294505219,
-            2839580074036780766
+            2839580074036780766,
         ];
         Merkle { root }
     }
@@ -82,16 +82,15 @@ impl Merkle {
         }
     }
 
-
     /// Set the raw leaf data of a merkle subtree
     pub fn set_simple(&mut self, index: u32, data: &[u64; 4], hint: Option<&[u64; 4]>) {
         // place a dummy get for merkle proof convension
         unsafe {
-                merkle_address(index as u64);
-                merkle_setroot(self.root[0]);
-                merkle_setroot(self.root[1]);
-                merkle_setroot(self.root[2]);
-                merkle_setroot(self.root[3]);
+            merkle_address(index as u64);
+            merkle_setroot(self.root[0]);
+            merkle_setroot(self.root[1]);
+            merkle_setroot(self.root[2]);
+            merkle_setroot(self.root[3]);
         }
         if let Some(hint_data) = hint {
             unsafe {
@@ -171,7 +170,6 @@ impl Merkle {
         cache::store_data(&hash, data);
         self.set_simple_unsafe(index, &hash);
     }
-
 }
 
 const LEAF_NODE: u64 = 0;
@@ -180,10 +178,7 @@ const TREE_NODE: u64 = 1;
 // internal func: key must have length 4
 fn data_matches_key(data: &[u64], key: &[u64]) -> bool {
     // Recall that data[0] == LEAF_NODE
-    data[1] == key[0] &&
-    data[2] == key[1] &&
-    data[3] == key[2] &&
-    data[4] == key[3]
+    data[1] == key[0] && data[2] == key[1] && data[3] == key[2] && data[4] == key[3]
     /*
     for i in 0..4 {
         if data[i + 1] != key[i] {
@@ -207,18 +202,13 @@ fn set_smt_data(node_buf: &mut [u64], t: u64, key: &[u64], data: &[u64]) {
 }
 
 impl Merkle {
-    fn smt_get_local(
-        &mut self,
-        key: &[u64; 4],
-        path_index: usize,
-        data: &mut [u64],
-    ) -> u64 {
+    fn smt_get_local(&mut self, key: &[u64; 4], path_index: usize, data: &mut [u64]) -> u64 {
         //crate::dbg!("start smt_get_local {}\n", path_index);
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
         let mut hash = [0; 4];
         // pad is true since the leaf might the root of a sub merkle
-        let len = self.get(local_index, data, &mut hash,true);
+        let len = self.get(local_index, data, &mut hash, true);
         if len == 0 {
             // no node was find
             return 0;
@@ -305,5 +295,96 @@ impl SMT for Merkle {
 
     fn smt_set(&mut self, key: &[u64; 4], data: &[u64]) {
         self.smt_set_local(key, 0, data)
+    }
+}
+
+impl Merkle {
+    // optimized version for
+    fn smt_get_local_u64(&mut self, key: u64, path_index: usize) -> u64 {
+        //crate::dbg!("start smt_get_local {}\n", path_index);
+        unsafe { require(path_index < 2) };
+        let local_index = (key >> (32 * (path_index % 2))) as u32;
+        // pad is true since the leaf might the root of a sub merkle
+        let mut stored_data = [0; 4];
+        self.get_simple(local_index, &mut stored_data);
+        // data is stored in little endian
+        let mode = ((stored_data[3].to_be_bytes()[0] & 0b10000000) >> 7) as u64;
+        if mode == LEAF_NODE {
+            // second highest bit indicates the leaf node is empty or not
+            let not_empty = (stored_data[3].to_be_bytes()[0] & 0b1000000) >> 6;
+            let stored_key = stored_data[0];
+            if (not_empty == 1) && key == stored_key {
+                return stored_data[1];
+            } else {
+                // is empty or not hit
+                return 0;
+            }
+        } else {
+            // make sure that there are only 2 level
+            unsafe {
+                crate::require(path_index == 0);
+            }
+            //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
+            stored_data[3] = stored_data[3] & 0b01111111;
+            let mut sub_merkle = Merkle::load(stored_data);
+            sub_merkle.smt_get_local_u64(key, path_index + 1)
+        }
+    }
+
+    fn smt_set_local_u64(&mut self, key: u64, path_index: usize, data: u64) {
+        unsafe { require(path_index < 2) };
+        let local_index = (key >> (32 * (path_index % 2))) as u32;
+        let mut stored_data = [0; 4];
+        self.get_simple(local_index, &mut stored_data);
+        let mode = ((stored_data[3].to_be_bytes()[0] & 0b10000000) >> 7) as u64;
+
+        if mode == LEAF_NODE {
+            let not_empty = (stored_data[3].to_be_bytes()[0] & 0b1000000) >> 6;
+            if not_empty == 0 {
+                //crate::dbg!("empty data {}:\n", stored_data);
+                self.set_simple(local_index, &[key, data, 0, 0b11000000], None);
+            } else {
+                //crate::dbg!("smt set local hit:\n");
+                if key == stored_data[0] {
+                    //crate::dbg!("current node for set is leaf:\n");
+                    stored_data[0] = key;
+                    stored_data[1] = data;
+                    self.set_simple(local_index, &stored_data, None);
+                } else {
+                    //crate::dbg!("key not match, creating sub node:\n");
+                    // conflict of key here
+                    // 1. start a new merkle sub tree
+                    let mut sub_merkle = Merkle::new();
+                    sub_merkle.smt_set_local_u64(stored_data[0], path_index + 1, stored_data[1]);
+                    sub_merkle.smt_set_local_u64(key, path_index + 1, data);
+                    stored_data = sub_merkle.root;
+                    stored_data[3] = stored_data[3] | 0b10000000;
+                    // 2 update the current node with the sub merkle tree
+                    self.set_simple(local_index, &stored_data, None);
+                }
+            }
+        } else {
+            //crate::dbg!("current node for set is node:\n");
+            // the node is already a sub merkle
+            // make sure that there are only 2 level
+            unsafe {
+                crate::require(path_index == 0);
+            }
+            stored_data[3] = stored_data[3] & 0b01111111;
+            let mut sub_merkle = Merkle::load(stored_data);
+            sub_merkle.smt_set_local_u64(key, path_index + 1, data);
+            sub_merkle.root[3] = sub_merkle.root[3] | 0b10000000;
+            self.set_simple(local_index, &sub_merkle.root, None);
+        }
+    }
+}
+
+impl SMTU64 for Merkle {
+    fn smt_get(&mut self, key: u64) -> u64 {
+        self.smt_get_local_u64(key, 0)
+    }
+
+    fn smt_set(&mut self, key: u64, data: u64) {
+        self.smt_set_local_u64(key, 0, data)
     }
 }
