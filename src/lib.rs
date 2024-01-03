@@ -26,10 +26,10 @@ extern "C" {
 
 }
 
+pub mod cache;
 pub mod jubjub;
 pub mod kvpair;
 pub mod merkle;
-pub mod cache;
 pub mod poseidon;
 
 #[cfg(feature = "witness")]

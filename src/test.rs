@@ -53,7 +53,6 @@ pub fn test_merkle() {
         require(leaf == [3, 4, 5, 6, 7]);
     }
 
-
     crate::dbg!("testing merkle set simple, index: 1\n");
     merkle.set_simple(1, &[4, 5, 6, 7]);
     let mut leaf2 = [0, 0, 0, 0];

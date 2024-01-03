@@ -34,6 +34,6 @@ pub fn fetch_data(hash: &[u64; 4], data: &mut [u64]) -> u64 {
                 data[i] = cache_fetch_data();
             }
         }
-        return len
+        return len;
     }
 }

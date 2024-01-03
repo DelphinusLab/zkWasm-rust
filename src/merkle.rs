@@ -6,10 +6,10 @@ extern "C" {
     pub fn merkle_getroot() -> u64;
 }
 
+use crate::cache;
 use crate::kvpair::SMT;
 use crate::poseidon::PoseidonHasher;
 use crate::require;
-use crate::cache;
 
 pub struct Merkle {
     pub root: [u64; 4],
@@ -64,7 +64,7 @@ impl Merkle {
             14789582351289948625,
             10919489180071018470,
             10309858136294505219,
-            2839580074036780766
+            2839580074036780766,
         ];
         Merkle { root }
     }
@@ -89,12 +89,13 @@ impl Merkle {
             merkle_getroot();
             merkle_getroot();
         }
+        #[cfg(feature = "merkle_track")]
         Track::set_track(&self.root, index);
     }
 
     pub fn set_simple(&mut self, index: u32, data: &[u64; 4]) {
         // place a dummy get for merkle proof convension
-        if Track::tracked(&self.root, index) {
+        if cfg!(feature = "merkel_track") && Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
@@ -137,6 +138,7 @@ impl Merkle {
             self.root[3] = merkle_getroot();
         }
 
+        #[cfg(feature = "merkle_track")]
         Track::reset_track();
     }
 
@@ -177,10 +179,7 @@ const TREE_NODE: u64 = 1;
 // internal func: key must have length 4
 fn data_matches_key(data: &[u64], key: &[u64]) -> bool {
     // Recall that data[0] == LEAF_NODE
-    data[1] == key[0] &&
-    data[2] == key[1] &&
-    data[3] == key[2] &&
-    data[4] == key[3]
+    data[1] == key[0] && data[2] == key[1] && data[3] == key[2] && data[4] == key[3]
     /*
     for i in 0..4 {
         if data[i + 1] != key[i] {
