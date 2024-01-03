@@ -8,6 +8,7 @@ extern "C" {
 use crate::jubjub::BabyJubjubPoint;
 use crate::jubjub::JubjubSignature;
 use crate::kvpair::KeyValueMap;
+use crate::kvpair::KeyValueMapU64;
 use crate::merkle::Merkle;
 use primitive_types::U256;
 
@@ -81,7 +82,6 @@ pub fn test_kvpair() {
     let key4 = [1, 5, 3, 5];
     let key5 = [1, 5, 3, (2u64 << 32) + 5];
     let key6 = [1, 5, 4, (2u64 << 32) + 5];
-    let key7 = [3, 2, 3, 4];
 
     let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
 
@@ -122,6 +122,26 @@ pub fn test_kvpair() {
 
     let len = kvpair.get(&key6, &mut data_buf);
     unsafe { require(len == 0) };
+}
+
+pub fn test_kvpair_u64() {
+    let merkle = Merkle::new();
+    let mut kvpair = KeyValueMapU64::new(merkle);
+    for i in 0..64 {
+        let key = i * 0xffffffffu64;
+        let data = i;
+        kvpair.set(key, data);
+    }
+
+    for i in 0..64 {
+        let key = i * 0xffffffffu64;
+        let data = i;
+        let data_in = kvpair.get(key);
+        if data != data_in {
+            crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
+        }
+        unsafe { require(data == data_in) };
+    }
 }
 
 pub fn test_jubjub() {
@@ -185,6 +205,8 @@ pub fn zkmain() -> i64 {
         test_jubjub();
         crate::dbg!("testing kvpair\n");
         test_kvpair();
+        crate::dbg!("testing kvpair u64\n");
+        test_kvpair_u64();
     }
     if true {
         super::witness::test_witness_obj();

@@ -115,22 +115,7 @@ impl Merkle {
             merkle_getroot();
 
             // perform the set
-            merkle_address(index as u64);
-
-            merkle_setroot(self.root[0]);
-            merkle_setroot(self.root[1]);
-            merkle_setroot(self.root[2]);
-            merkle_setroot(self.root[3]);
-
-            merkle_set(data[0]);
-            merkle_set(data[1]);
-            merkle_set(data[2]);
-            merkle_set(data[3]);
-
-            self.root[0] = merkle_getroot();
-            self.root[1] = merkle_getroot();
-            self.root[2] = merkle_getroot();
-            self.root[3] = merkle_getroot();
+            self.set_simple_unsafe(index, data);
         }
     }
 
@@ -308,10 +293,10 @@ impl Merkle {
         let mut stored_data = [0; 4];
         self.get_simple(local_index, &mut stored_data);
         // data is stored in little endian
-        let mode = ((stored_data[3].to_be_bytes()[0] & 0b10000000) >> 7) as u64;
+        let mode = ((stored_data[3] & 0b10000000) >> 7) as u64;
         if mode == LEAF_NODE {
             // second highest bit indicates the leaf node is empty or not
-            let not_empty = (stored_data[3].to_be_bytes()[0] & 0b1000000) >> 6;
+            let not_empty = (stored_data[3] & 0b1000000) >> 6;
             let stored_key = stored_data[0];
             if (not_empty == 1) && key == stored_key {
                 return stored_data[1];
@@ -336,22 +321,21 @@ impl Merkle {
         let local_index = (key >> (32 * (path_index % 2))) as u32;
         let mut stored_data = [0; 4];
         self.get_simple(local_index, &mut stored_data);
-        let mode = ((stored_data[3].to_be_bytes()[0] & 0b10000000) >> 7) as u64;
+        let mode = ((stored_data[3] & 0b10000000) >> 7) as u64;
 
         if mode == LEAF_NODE {
-            let not_empty = (stored_data[3].to_be_bytes()[0] & 0b1000000) >> 6;
+            let not_empty = (stored_data[3] & 0b1000000) >> 6;
             if not_empty == 0 {
-                //crate::dbg!("empty data {}:\n", stored_data);
-                self.set_simple(local_index, &[key, data, 0, 0b11000000], None);
+                self.set_simple(local_index, &[key, data, 0, 0b01000000], None);
             } else {
-                //crate::dbg!("smt set local hit:\n");
+                crate::dbg!("smt set local hit:\n");
                 if key == stored_data[0] {
-                    //crate::dbg!("current node for set is leaf:\n");
+                    crate::dbg!("current node for set is leaf:\n");
                     stored_data[0] = key;
                     stored_data[1] = data;
                     self.set_simple(local_index, &stored_data, None);
                 } else {
-                    //crate::dbg!("key not match, creating sub node:\n");
+                    crate::dbg!("key not match, creating sub node:\n");
                     // conflict of key here
                     // 1. start a new merkle sub tree
                     let mut sub_merkle = Merkle::new();
@@ -364,7 +348,7 @@ impl Merkle {
                 }
             }
         } else {
-            //crate::dbg!("current node for set is node:\n");
+            crate::dbg!("current node for set is node:\n");
             // the node is already a sub merkle
             // make sure that there are only 2 level
             unsafe {
