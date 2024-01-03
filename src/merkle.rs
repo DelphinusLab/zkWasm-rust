@@ -27,6 +27,7 @@ static mut LAST_TRACK: Option<Track> = None;
 static mut DATA_NODE_BUF: [u64; 1024] = [0; 1024];
 
 impl Track {
+    #[cfg(feature = "merkle_track")]
     pub fn set_track(root: &[u64; 4], index: u32) {
         unsafe {
             LAST_TRACK = Some(Track {
@@ -36,18 +37,21 @@ impl Track {
         }
     }
 
+    #[cfg(feature = "merkle_track")]
     pub fn reset_track() {
         unsafe { LAST_TRACK = None }
     }
 
+    #[inline(always)]
     pub fn tracked(root: &[u64; 4], index: u32) -> bool {
-        unsafe {
-            LAST_TRACK
-                == Some(Track {
-                    last_root: root.clone(),
-                    last_index: index,
-                })
-        }
+        cfg!(feature = "merkel_track")
+            && unsafe {
+                LAST_TRACK
+                    == Some(Track {
+                        last_root: root.clone(),
+                        last_index: index,
+                    })
+            }
     }
 }
 
@@ -95,7 +99,7 @@ impl Merkle {
 
     pub fn set_simple(&mut self, index: u32, data: &[u64; 4]) {
         // place a dummy get for merkle proof convension
-        if cfg!(feature = "merkel_track") && Track::tracked(&self.root, index) {
+        if Track::tracked(&self.root, index) {
             ()
         } else {
             unsafe {
