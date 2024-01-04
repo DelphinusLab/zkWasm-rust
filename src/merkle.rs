@@ -294,8 +294,6 @@ fn is_empty(a: u64) -> bool {
     (a & IS_EMPTY_BIT) == 0
 }
 
-
-
 impl Merkle {
     // optimized version for
     fn smt_get_local_u64(&mut self, key: u64, path_index: usize) -> u64 {
@@ -318,11 +316,11 @@ impl Merkle {
                 return 0;
             }
         } else {
+            //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
             // make sure that there are only 2 level
             unsafe {
                 crate::require(path_index == 0);
             }
-            crate::dbg!("smt_get_local is node: continue in sub merkle\n");
             stored_data[3] = stored_data[3] & !IS_NODE_BIT;
             let mut sub_merkle = Merkle::load(stored_data);
             sub_merkle.smt_get_local_u64(key, path_index + 1)
@@ -342,14 +340,14 @@ impl Merkle {
             if is_empty {
                 self.set_simple(local_index, &[key, data, 0, IS_EMPTY_BIT], None);
             } else {
-                crate::dbg!("smt set local hit:\n");
+                //crate::dbg!("smt set local hit:\n");
                 if key == stored_data[0] {
-                    crate::dbg!("current node for set is leaf:\n");
+                    //crate::dbg!("current node for set is leaf:\n");
                     stored_data[0] = key;
                     stored_data[1] = data;
                     self.set_simple(local_index, &stored_data, None);
                 } else {
-                    crate::dbg!("key not match, creating sub node:\n");
+                    //crate::dbg!("key not match, creating sub node:\n");
                     // conflict of key here
                     // 1. start a new merkle sub tree
                     let mut sub_merkle = Merkle::new();
@@ -357,20 +355,17 @@ impl Merkle {
                     sub_merkle.smt_set_local_u64(key, path_index + 1, data);
                     stored_data = sub_merkle.root;
                     stored_data[3] = stored_data[3] | IS_NODE_BIT;
-                    crate::dbg!("hash is {:?}\n", stored_data);
                     // 2 update the current node with the sub merkle tree
                     self.set_simple(local_index, &stored_data, None);
                 }
             }
         } else {
-            crate::dbg!("current node for set is node:\n");
-            // the node is already a sub merkle
+            //crate::dbg!("current node for set is node:\n");
             // make sure that there are only 2 level
             unsafe {
                 crate::require(path_index == 0);
             }
             stored_data[3] = stored_data[3] & !IS_NODE_BIT;
-            crate::dbg!("fetch hash is {:?}\n", stored_data);
             let mut sub_merkle = Merkle::load(stored_data);
             sub_merkle.smt_set_local_u64(key, path_index + 1, data);
             sub_merkle.root[3] = sub_merkle.root[3] | IS_NODE_BIT;

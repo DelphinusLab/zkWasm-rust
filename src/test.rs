@@ -130,20 +130,23 @@ pub fn test_kvpair_u64() {
     let count = 4;
     for i in 0..count {
         for j in 0..count {
-            crate::dbg!("fill {} {}\n", i, j);
-            let key = i + (j<<32);
+            let key = i + (j << 32);
             let data = i * 16 + j;
+            let trace_size = unsafe { wasm_trace_size() };
             kvpair.set(key, data);
-            crate::dbg!("fill done {} {}\n", i, j);
+            let delta_size = unsafe { wasm_trace_size() - trace_size };
+            crate::dbg!("fill size {}\n", delta_size);
         }
     }
 
     for i in 0..count {
         for j in 0..count {
-            crate::dbg!("test {} {}", i, j);
-            let key = i + (j<<32);
+            let key = i + (j << 32);
             let data = i * 16 + j;
+            let trace_size = unsafe { wasm_trace_size() };
             let data_in = kvpair.get(key);
+            let delta_size = unsafe { wasm_trace_size() - trace_size };
+            crate::dbg!("get size is {}\n", delta_size);
             if data != data_in {
                 crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
             }
