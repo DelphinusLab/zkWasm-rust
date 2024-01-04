@@ -1,10 +1,10 @@
 pub trait SMT {
-    fn smt_get(&mut self, key: &[u64; 4], data: &mut [u64]) -> u64;
+    fn smt_get(&self, key: &[u64; 4], data: &mut [u64]) -> u64;
     fn smt_set(&mut self, key: &[u64; 4], data: &[u64]);
 }
 
 pub trait SMTU64 {
-    fn smt_get(&mut self, key: u64) -> u64;
+    fn smt_get(&self, key: u64) -> u64;
     fn smt_set(&mut self, key: u64, data: u64);
 }
 
@@ -23,7 +23,7 @@ impl<S: SMT> KeyValueMap<S> {
     pub fn set(&mut self, key: &[u64; 4], data_buf: &[u64]) {
         self.merkle.smt_set(key, data_buf);
     }
-    pub fn get(&mut self, key: &[u64; 4], data_buf: &mut [u64]) -> u64 {
+    pub fn get(&self, key: &[u64; 4], data_buf: &mut [u64]) -> u64 {
         self.merkle.smt_get(key, data_buf)
     }
 }
@@ -41,7 +41,7 @@ impl<S: SMTU64> KeyValueMapU64<S> {
     pub fn set(&mut self, key: u64, data: u64) {
         self.merkle.smt_set(key, data);
     }
-    pub fn get(&mut self, key: u64) -> u64 {
+    pub fn get(&self, key: u64) -> u64 {
         self.merkle.smt_get(key)
     }
 }

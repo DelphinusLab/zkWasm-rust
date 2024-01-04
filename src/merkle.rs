@@ -37,7 +37,7 @@ impl Merkle {
     }
 
     /// Get the raw leaf data of a merkle subtree
-    pub fn get_simple(&mut self, index: u32, data: &mut [u64; 4]) {
+    pub fn get_simple(&self, index: u32, data: &mut [u64; 4]) {
         unsafe {
             merkle_address(index as u64); // build in merkle address has default depth 32
 
@@ -119,7 +119,7 @@ impl Merkle {
         }
     }
 
-    pub fn get(&mut self, index: u32, data: &mut [u64], hash: &mut [u64; 4], pad: bool) -> u64 {
+    pub fn get(&self, index: u32, data: &mut [u64], hash: &mut [u64; 4], pad: bool) -> u64 {
         self.get_simple(index, hash);
         let len = cache::fetch_data(&hash, data);
         if len > 0 {
@@ -187,7 +187,7 @@ fn set_smt_data(node_buf: &mut [u64], t: u64, key: &[u64], data: &[u64]) {
 }
 
 impl Merkle {
-    fn smt_get_local(&mut self, key: &[u64; 4], path_index: usize, data: &mut [u64]) -> u64 {
+    fn smt_get_local(&self, key: &[u64; 4], path_index: usize, data: &mut [u64]) -> u64 {
         //crate::dbg!("start smt_get_local {}\n", path_index);
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
@@ -213,7 +213,7 @@ impl Merkle {
             } else {
                 //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
                 unsafe { require((data[0] & 0x1) == TREE_NODE) };
-                let mut sub_merkle = Merkle::load(data[1..5].try_into().unwrap());
+                let sub_merkle = Merkle::load(data[1..5].try_into().unwrap());
                 sub_merkle.smt_get_local(key, path_index + 1, data)
             }
         }
@@ -274,7 +274,7 @@ impl Merkle {
 }
 
 impl SMT for Merkle {
-    fn smt_get(&mut self, key: &[u64; 4], data: &mut [u64]) -> u64 {
+    fn smt_get(&self, key: &[u64; 4], data: &mut [u64]) -> u64 {
         self.smt_get_local(key, 0, data)
     }
 
@@ -296,7 +296,7 @@ fn is_empty(a: u64) -> bool {
 
 impl Merkle {
     // optimized version for
-    fn smt_get_local_u64(&mut self, key: u64, path_index: usize) -> u64 {
+    fn smt_get_local_u64(&self, key: u64, path_index: usize) -> u64 {
         //crate::dbg!("start smt_get_local {}\n", path_index);
         unsafe { require(path_index < 2) };
         let local_index = (key >> (32 * (path_index % 2))) as u32;
@@ -322,7 +322,7 @@ impl Merkle {
                 crate::require(path_index == 0);
             }
             stored_data[3] = stored_data[3] & !IS_NODE_BIT;
-            let mut sub_merkle = Merkle::load(stored_data);
+            let sub_merkle = Merkle::load(stored_data);
             sub_merkle.smt_get_local_u64(key, path_index + 1)
         }
     }
@@ -375,7 +375,7 @@ impl Merkle {
 }
 
 impl SMTU64 for Merkle {
-    fn smt_get(&mut self, key: u64) -> u64 {
+    fn smt_get(&self, key: u64) -> u64 {
         self.smt_get_local_u64(key, 0)
     }
 
