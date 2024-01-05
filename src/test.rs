@@ -221,6 +221,10 @@ pub fn zkmain() -> i64 {
     }
     if true {
         super::witness::test_witness_obj();
+        super::witness::test_witness_indexed(0xff);
+        super::witness::test_witness_indexed(0x1);
+        super::witness::test_witness_indexed(0x2);
+        super::witness::test_witness_indexed(0xff);
     }
     super::dbg!("test done\n");
     0

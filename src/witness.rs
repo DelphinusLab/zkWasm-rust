@@ -2,7 +2,10 @@ extern "C" {
     /// inserts a witness at the current wasm_private inputs cursor
     pub fn wasm_witness_insert(u: u64);
     pub fn wasm_witness_pop() -> u64;
-    pub fn wasm_input(x: u32) -> u64;
+    pub fn wasm_witness_set_index(x: u64);
+    pub fn wasm_witness_indexed_pop() -> u64;
+    pub fn wasm_witness_indexed_insert(x: u64);
+    pub fn wasm_witness_indexed_push(x: u64);
     pub fn require(cond: bool);
 }
 
@@ -215,5 +218,20 @@ pub fn test_witness_obj() {
     let v = unsafe { &*obj };
     for i in 0..100 {
         unsafe { require(v[i] == (i as u64)) };
+    }
+}
+
+pub fn test_witness_indexed(i: u64) {
+    unsafe {
+        wasm_witness_set_index(i);
+        wasm_witness_indexed_push(0x0);
+        wasm_witness_indexed_push(0x1);
+        wasm_witness_indexed_insert(0x2);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x1);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x0);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x2);
     }
 }
