@@ -17,12 +17,32 @@ use crate::allocator::start_alloc_witness;
 use crate::allocator::alloc_witness_memory;
 use std::mem::size_of;
 
+pub trait WitnessFetcher {
+    fn get_witness() -> u64;
+}
+
+pub struct InputFetcher {}
+
+impl WitnessFetcher for InputFetcher {
+    fn get_witness() -> u64 {
+        unsafe {crate::wasm_input(0)}
+    }
+}
+
+pub struct DynamicWitnessFetcher {}
+
+impl WitnessFetcher for DynamicWitnessFetcher {
+    fn get_witness() -> u64 {
+        unsafe {wasm_witness_pop()}
+    }
+}
+
 pub trait WitnessObjWriter {
     fn to_witness(&self, ori_base: *const u8);
 }
 
 pub trait WitnessObjReader {
-    fn from_witness(obj: *mut Self, base: *const u8);
+    fn from_witness<WF: WitnessFetcher>(obj: *mut Self, base: *const u8);
 }
 
 impl WitnessObjWriter for u64 {
@@ -34,9 +54,9 @@ impl WitnessObjWriter for u64 {
 }
 
 impl WitnessObjReader for u64 {
-    fn from_witness(obj: *mut Self, _base: *const u8) {
+    fn from_witness<WF: WitnessFetcher>(obj: *mut Self, _base: *const u8) {
         unsafe {
-            *obj = wasm_witness_pop();
+            *obj = WF::get_witness();
         }
     }
 }
@@ -58,12 +78,12 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
 }
 
 impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
-    fn from_witness(obj: *mut Self, base: *const u8) {
+    fn from_witness<WF: WitnessFetcher>(obj: *mut Self, base: *const u8) {
         unsafe {
-            let arr_ptr = wasm_witness_pop() as usize;
+            let arr_ptr = WF::get_witness() as usize;
             let arr_ptr = base.add(arr_ptr);
-            let len = wasm_witness_pop() as usize;
-            let cap = wasm_witness_pop() as usize;
+            let len = WF::get_witness() as usize;
+            let cap = WF::get_witness() as usize;
             let obj_ptr = obj as *mut usize;
             *obj_ptr = arr_ptr as usize;
             *obj_ptr.add(1) = len;
@@ -75,8 +95,7 @@ impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
             require(start <= start + mem_len);
             require(start + mem_len <= WITNESS_AREA_END);
             for i in 0..len {
-                //T::from_witness(unsafe { offset.add(i) as *mut T });
-                *(offset as *mut u64).add(i) = wasm_witness_pop();
+                T::from_witness::<WF>(offset.add(i) as *mut T, base);
             }
         }
     }
@@ -93,7 +112,8 @@ fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     let c = Box::new(b.clone());
     let ori_base = get_latest_allocation_base();
     unsafe {
-        wasm_witness_insert((c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64);
+        let diff = (c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64;
+        require(diff == 0);
     }
     c.to_witness(ori_base);
     unsafe {
@@ -101,16 +121,15 @@ fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
     }
 }
 
-fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
+fn load_witness_obj<WF: WitnessFetcher, Obj: Clone + WitnessObjReader + WitnessObjWriter>(
     base: *mut u8,
 ) -> *const Obj {
-    let obj_offset = unsafe { wasm_witness_pop() as usize };
-    let obj_start = base as usize + obj_offset;
+    let obj_start = base as usize;
     unsafe {
         require(obj_start >= WITNESS_AREA);
     }
     let obj = obj_start as *mut Obj;
-    Obj::from_witness(obj, base);
+    Obj::from_witness::<WF>(obj, base);
     obj as *const Obj
 }
 
@@ -132,7 +151,7 @@ pub fn test_witness_obj() {
     let base_addr = alloc_witness_memory();
     crate::dbg!("witness base addr is {:?}\n", base_addr);
     prepare_u64_vec(0);
-    let obj = load_witness_obj::<Vec<u64>>(base_addr);
+    let obj = load_witness_obj::<DynamicWitnessFetcher, Vec<u64>>(base_addr);
     let v = unsafe { &*obj };
     for i in 0..100 {
         unsafe { require(v[i] == (i as u64)) };
