@@ -1,5 +1,4 @@
 #![cfg_attr(feature = "witness", feature(ptr_sub_ptr))]
-#![feature(associated_type_bounds)]
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
