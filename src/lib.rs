@@ -31,6 +31,7 @@ pub mod jubjub;
 pub mod kvpair;
 pub mod merkle;
 pub mod poseidon;
+pub mod allocator;
 
 #[cfg(feature = "witness")]
 pub mod witness;
@@ -38,9 +39,6 @@ pub mod witness;
 pub use jubjub::*;
 pub use merkle::*;
 pub use poseidon::*;
-
-#[cfg(feature = "witness")]
-pub use witness::*;
 
 pub fn wasm_dbg_str(s: &str) {
     unsafe {
