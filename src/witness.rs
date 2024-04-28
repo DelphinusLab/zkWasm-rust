@@ -2,97 +2,31 @@ extern "C" {
     /// inserts a witness at the current wasm_private inputs cursor
     pub fn wasm_witness_insert(u: u64);
     pub fn wasm_witness_pop() -> u64;
-    pub fn wasm_input(x: u32) -> u64;
+    pub fn wasm_witness_set_index(x: u64);
+    pub fn wasm_witness_indexed_pop() -> u64;
+    pub fn wasm_witness_indexed_insert(x: u64);
+    pub fn wasm_witness_indexed_push(x: u64);
     pub fn require(cond: bool);
-    pub fn wasm_dbg(v: u64);
 }
 
-use std::alloc::{GlobalAlloc, Layout, System};
+use crate::allocator::get_latest_allocation_base;
+use crate::allocator::WITNESS_AREA;
+use crate::allocator::WITNESS_AREA_END;
+use crate::allocator::stop_alloc_witness;
+use crate::allocator::start_alloc_witness;
+use crate::allocator::alloc_witness_memory;
 use std::mem::size_of;
-use std::ptr::null_mut;
-
-static mut WITNESS_AREA: usize = 0;
-static mut WITNESS_AREA_END: usize = 0;
-const MAX_WITNESS_OBJ_SIZE: usize = 800 * 1024;
-const MAX_SUPPORTED_ALIGN: usize = 4096;
-
-static mut ALLOC_WITNESS: bool = false;
-static mut SIMPLE_ALLOCATOR: SimpleAllocator = SimpleAllocator {
-    area: 0usize as *mut u8,
-    remaining: MAX_WITNESS_OBJ_SIZE,
-};
-
-/// Alloca a block of memory to hold the witness object.
-pub fn alloc_witness_memory() -> *mut u8 {
-    let base_addr =
-        unsafe { std::alloc::alloc(Layout::from_size_align(MAX_WITNESS_OBJ_SIZE, 8).unwrap()) };
-    unsafe {
-        WITNESS_AREA = base_addr as usize;
-        WITNESS_AREA_END = WITNESS_AREA + MAX_WITNESS_OBJ_SIZE;
-    };
-    base_addr
-}
-
-struct SimpleAllocator {
-    pub area: *mut u8,
-    remaining: usize,
-}
-
-struct HybridAllocator {}
-
-unsafe fn start_alloc_witness() {
-    SIMPLE_ALLOCATOR.area =
-        unsafe { std::alloc::alloc(Layout::from_size_align(MAX_WITNESS_OBJ_SIZE, 8).unwrap()) };
-    ALLOC_WITNESS = true;
-}
-
-unsafe fn stop_alloc_witness() {
-    ALLOC_WITNESS = false;
-    SIMPLE_ALLOCATOR.remaining = MAX_WITNESS_OBJ_SIZE;
-}
-
-unsafe impl Sync for HybridAllocator {}
-
-#[global_allocator]
-static ALLOCATOR: HybridAllocator = HybridAllocator {};
-
-unsafe impl GlobalAlloc for HybridAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if ALLOC_WITNESS {
-            let size = layout.size();
-            let align = layout.align();
-            let align_mask_to_round_down = !(align - 1);
-            if align > MAX_SUPPORTED_ALIGN {
-                return null_mut();
-            }
-            if size > SIMPLE_ALLOCATOR.remaining {
-                return null_mut();
-            }
-            SIMPLE_ALLOCATOR.remaining -= size;
-            SIMPLE_ALLOCATOR.remaining &= align_mask_to_round_down;
-            SIMPLE_ALLOCATOR.area.add(SIMPLE_ALLOCATOR.remaining)
-        } else {
-            System.alloc(layout)
-        }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ALLOC_WITNESS {
-        } else {
-            System.dealloc(ptr, layout);
-        }
-    }
-}
 
 pub trait WitnessObjWriter {
-    fn to_witness(&self, ori_base: *const u8, wit_base: *const u8);
+    fn to_witness(&self, ori_base: *const u8);
 }
 
 pub trait WitnessObjReader {
-    fn from_witness(&mut self);
+    fn from_witness(&mut self, fetcher: impl Fn()->u64, base: *const u8);
 }
 
 impl WitnessObjWriter for u64 {
-    fn to_witness(&self, _ori_base: *const u8, _wit_base: *const u8) {
+    fn to_witness(&self, _ori_base: *const u8) {
         unsafe {
             wasm_witness_insert(*self);
         }
@@ -100,116 +34,85 @@ impl WitnessObjWriter for u64 {
 }
 
 impl WitnessObjReader for u64 {
-    fn from_witness(&mut self) {
-        unsafe {
-            *self = wasm_witness_pop();
-        }
+    fn from_witness(&mut self, fetcher: impl Fn()->u64, _base: *const u8) {
+        *self = fetcher();
     }
 }
 
 impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
     /// [ptr, len, capacity, array[0... self.len()]
-    fn to_witness(&self, ori_base: *const u8, wit_base: *const u8) {
+    fn to_witness(&self, ori_base: *const u8) {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
-        let arr_ptr = unsafe { wit_base.add((c[0] as *const u8).sub_ptr(ori_base)) };
-
-        super::dbg!("arr_ptr is {:?}\n", arr_ptr);
-
-        let v = c[1];
-        super::dbg!("{:?}\n", v);
-
+        let arr_ptr = unsafe { (c[0] as *const u8).sub_ptr(ori_base) };
         unsafe {
             wasm_witness_insert(arr_ptr as u64);
             wasm_witness_insert(c[1] as u64);
             wasm_witness_insert(c[2] as u64);
         }
         for t in self {
-            t.to_witness(ori_base, wit_base);
+            t.to_witness(ori_base);
         }
     }
 }
 
 impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
-    fn from_witness(&mut self) {
+    fn from_witness(&mut self, fetcher: impl Fn()->u64, base: *const u8) {
         unsafe {
             let obj = self as *mut Self;
-            let arr_ptr = wasm_witness_pop() as usize;
-            let len = wasm_witness_pop() as usize;
-            let cap = wasm_witness_pop() as usize;
-
-            
-        super::dbg!("read arr_ptr is {:?} {:?} {:?}\n", arr_ptr, len, cap);
-
+            let arr_ptr = fetcher() as usize;
+            let arr_ptr = base.add(arr_ptr);
+            let len = fetcher() as usize;
+            let cap = fetcher() as usize;
             let obj_ptr = obj as *mut usize;
-            *obj_ptr = arr_ptr;
+            *obj_ptr = arr_ptr as usize;
             *obj_ptr.add(1) = len;
             *obj_ptr.add(2) = cap;
             let start = arr_ptr as usize;
             let mem_len = len * size_of::<T>();
-            super::dbg!("start is {} WITNESS_AREA is {}\n", start, WITNESS_AREA);
             require(start >= WITNESS_AREA);
-            require(mem_len < MAX_WITNESS_OBJ_SIZE);
-            require(start + len <= WITNESS_AREA_END);
+            require(start <= start + mem_len);
+            require(start + mem_len <= WITNESS_AREA_END);
             for i in 0..len {
-                (*(obj_ptr as *mut Vec<T>))[i].from_witness();
+                //super::dbg!("from witness size of {}\n", l);
+                (*(obj_ptr as *mut Vec<T>))[i].from_witness(&fetcher, base);
             }
         }
     }
 }
 
 fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
-    base: *const u8,
     gen: impl Fn(&T) -> Obj,
     t: &T,
 ) -> () {
     let b = gen(t);
     let c = Box::new(b.clone());
-    let ori_base = unsafe { SIMPLE_ALLOCATOR.area.add(SIMPLE_ALLOCATOR.remaining) };
+    let ori_base = get_latest_allocation_base();
     unsafe {
-        wasm_witness_insert((c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64);
+        let diff = (c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64;
+        require(diff == 0);
     }
-    c.to_witness(ori_base, base);
+    c.to_witness(ori_base);
 }
 
-fn load_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
+fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter>(
+    fetcher: impl Fn()->u64,
     base: *mut u8,
-    prepare: impl FnOnce(*const u8),
 ) -> *const Obj {
-    unsafe {
-        start_alloc_witness();
-    }
-    prepare(base);
-    unsafe {
-        stop_alloc_witness();
-    }
+    let obj_start = base as usize;
 
-    let obj_offset = unsafe { wasm_witness_pop() as usize };
-    let obj_start = base as usize + obj_offset;
-    let obj_end = obj_start + obj_offset;
-    unsafe {
-        require(obj_start >= WITNESS_AREA);
-        require(obj_end <= WITNESS_AREA_END);
-    }
     let obj = obj_start as *mut Obj;
     unsafe {
-        (*obj).from_witness();
+        (*obj).from_witness(fetcher, base);
     }
     obj as *const Obj
 }
 
-/// Load an object into wasm witness queue and restore it back to address start at (base: *mut 8)
-fn load_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
-    base: *mut u8,
-    prepare: impl FnOnce(*const u8),
-) -> *const Obj {
-    let obj = load_witness_obj_inner(base, prepare);
-    obj
-}
-
 #[inline(never)]
-pub fn prepare_u64_vec(base: *const u8, a: i64) {
+pub fn prepare_u64_vec(a: i64) {
+    unsafe {
+        start_alloc_witness();
+    }
     prepare_witness_obj(
-        base,
         |x: &u64| {
             let mut a = vec![];
             for i in 0..2000 {
@@ -219,18 +122,34 @@ pub fn prepare_u64_vec(base: *const u8, a: i64) {
         },
         &(a as u64),
     );
+    unsafe {
+        stop_alloc_witness();
+    }
+
 }
 
 pub fn test_witness_obj() {
     let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<Vec<u64>, u64>(base_addr, |base| prepare_u64_vec(base, 0));
+    prepare_u64_vec(0);
+    let obj = load_witness_obj::<Vec<u64>>(||unsafe{wasm_witness_pop()}, base_addr);
     let v = unsafe { &*obj };
     for i in 0..100 {
-        unsafe {
-            //wasm_dbg(v[i]);
-            require(v[i] == (i as u64))
-        };
+        unsafe { require(v[i] == (i as u64)) };
+    }
+}
+
+pub fn test_witness_indexed(i: u64) {
+    unsafe {
+        wasm_witness_set_index(i);
+        wasm_witness_indexed_push(0x0);
+        wasm_witness_indexed_push(0x1);
+        wasm_witness_indexed_insert(0x2);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x1);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x0);
+        let a = wasm_witness_indexed_pop();
+        require(a == 0x2);
     }
 }
 
@@ -244,9 +163,12 @@ struct TestA {
 }
 
 #[inline(never)]
-pub fn prepare_test_a(base: *const u8, a: i64) {
+pub fn prepare_test_a(a: i64) {
+    unsafe {
+        start_alloc_witness();
+    }
+
     prepare_witness_obj(
-        base,
         |x: &u64| {
             let mut c = vec![];
             for i in 0..10 {
@@ -256,12 +178,15 @@ pub fn prepare_test_a(base: *const u8, a: i64) {
         },
         &(a as u64),
     );
+    unsafe {
+        stop_alloc_witness();
+    }
 }
 
 pub fn test_witness_obj_test_a() {
     let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<TestA, usize>(base_addr, |base| prepare_test_a(base, 10));
+    prepare_test_a(10);
+    let obj = load_witness_obj::<TestA>(||unsafe{wasm_witness_pop()}, base_addr);
     let v = unsafe { &*obj };
     super::dbg!("test a is {:?}\n", v);
 }
@@ -274,9 +199,12 @@ struct TestB {
 }
 
 #[inline(never)]
-pub fn prepare_test_b(base: *const u8, a: i64) {
+pub fn prepare_test_b(a: i64) {
+    unsafe {
+        start_alloc_witness();
+    }
+
     prepare_witness_obj(
-        base,
         |x: &u64| {
             let mut c = vec![];
             let mut a_array = vec![];
@@ -299,12 +227,15 @@ pub fn prepare_test_b(base: *const u8, a: i64) {
         },
         &(a as u64),
     );
+    unsafe {
+        stop_alloc_witness();
+    }
 }
 
 pub fn test_witness_obj_test_b() {
     let base_addr = alloc_witness_memory();
-    unsafe { wasm_dbg(base_addr as u64) };
-    let obj = load_witness_obj::<TestB, usize>(base_addr, |base| prepare_test_b(base, 0));
+    prepare_test_b(0);
+    let obj = load_witness_obj::<TestB>(||unsafe{wasm_witness_pop()}, base_addr);
     let v = unsafe { &*obj };
     super::dbg!("test b is {:?}\n", v);
 }

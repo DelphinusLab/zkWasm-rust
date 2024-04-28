@@ -1,7 +1,5 @@
-#![cfg_attr(
-    feature = "witness",
-    feature(ptr_sub_ptr)
-)]
+#![cfg_attr(feature = "witness", feature(ptr_sub_ptr))]
+#![feature(associated_type_bounds)]
 
 extern "C" {
     pub fn wasm_input(is_public: u32) -> u64;
@@ -29,9 +27,12 @@ extern "C" {
 
 }
 
+pub mod cache;
 pub mod jubjub;
+pub mod kvpair;
 pub mod merkle;
 pub mod poseidon;
+pub mod allocator;
 
 #[cfg(feature = "witness")]
 pub mod witness;
@@ -39,9 +40,6 @@ pub mod witness;
 pub use jubjub::*;
 pub use merkle::*;
 pub use poseidon::*;
-
-#[cfg(feature = "witness")]
-pub use witness::*;
 
 pub fn wasm_dbg_str(s: &str) {
     unsafe {

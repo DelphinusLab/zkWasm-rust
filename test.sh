@@ -8,18 +8,10 @@ mkdir output
 
 FUNC=zkmain
 
-~/zkWasm/target/release/delphinus-cli -k 22 --host standard --function $FUNC --output ./output --param ./params --wasm ./pkg/output.wasm dry-run --private 2:i64
-
 # Single test
-#~/zkWasm/target/release/delphinus-cli -k 22 --function $FUNC --output ./output --param ./output --wasm ./pkg/output.wasm setup
-#~/zkWasm/target/release/delphinus-cli --phantom idx:9 -k 22  --function $FUNC --output ./output --param ./output --wasm ./pkg/output.wasm single-prove --private 2:i64
+~/zkWasm/target/release/delphinus-cli --params ./params rustsdk setup --wasm ./pkg/output.wasm --host standard -k 22
+~/zkWasm/target/release/delphinus-cli --params ./params rustsdk dry-run --wasm ./pkg/output.wasm --output ./output --private 2:i64
 
-~/zkWasm/target/release/delphinus-cli -k 22 --host standard --function $FUNC --output ./output --param ./params --wasm ./pkg/output.wasm setup
-~/zkWasm/target/release/delphinus-cli -k 22 --host standard --function $FUNC --output ./output --param ./params --wasm ./pkg/output.wasm single-prove --private 2:i64
-
-
-
-# Perform host circuit proofs
-~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname poseidonhash --output output/ --param params
-~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname merkle --output output/ --param params
-~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname jubjubsum --output output/ --param params
+#~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname poseidonhash --output output/ --param params
+#~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname merkle --output output/ --param params
+#~/zkWasm-host-circuits/target/release/zkwasm-host-circuits-prover --input external_host_table.json --opname jubjubsum --output output/ --param params
