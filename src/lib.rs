@@ -27,12 +27,12 @@ extern "C" {
 
 }
 
+pub mod allocator;
 pub mod cache;
 pub mod jubjub;
 pub mod kvpair;
 pub mod merkle;
 pub mod poseidon;
-pub mod allocator;
 
 #[cfg(feature = "witness")]
 pub mod witness;

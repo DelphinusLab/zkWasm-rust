@@ -74,6 +74,6 @@ unsafe impl GlobalAlloc for HybridAllocator {
     }
 }
 
-pub fn get_latest_allocation_base() -> * const u8 {
+pub fn get_latest_allocation_base() -> *const u8 {
     unsafe { SIMPLE_ALLOCATOR.area.add(SIMPLE_ALLOCATOR.remaining) }
 }
