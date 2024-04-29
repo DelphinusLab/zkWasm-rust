@@ -324,6 +324,23 @@ mod witness_test {
     }
 }
 
+use crate::witness::WitnessObjWriter;
+use crate::witness::WitnessObjReader;
+
+#[derive(WitnessObj, PartialEq, Clone, Debug)]
+struct AA {}
+
+#[derive(WitnessObj, PartialEq, Clone, Debug)]
+struct BB {}
+
+use derive_builder::WitnessObj;
+#[derive(WitnessObj, PartialEq, Clone, Debug)]
+enum EA {
+   A(AA),
+   B(BB),
+}
+
+
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
     if false {
