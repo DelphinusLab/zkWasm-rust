@@ -47,7 +47,7 @@ impl Context {
             }
 
             impl WitnessObjReader for #name {
-                fn from_witness(&mut self, fetcher: impl Fn() -> u64,  base: *const u8) {
+                fn from_witness(&mut self, fetcher: &mut impl FnMut() -> u64,  base: *const u8) {
                     unsafe {
                         #(#fields_reader)*
                     }
@@ -60,7 +60,7 @@ impl Context {
         let mut ret = vec![];
         for i in 0..self.fields.len() {
             let name = self.fields[i].name.clone();
-            ret.push(quote!(self.#name.from_witness(&fetcher, base);));
+            ret.push(quote!(self.#name.from_witness(fetcher, base);));
         }
         ret
     }
