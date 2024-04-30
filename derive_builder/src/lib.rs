@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Variant};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Variant, Type};
 
 struct Fd {
     name: Ident,
@@ -14,7 +14,7 @@ struct StructContext {
 
 struct Ed {
     name: Ident,
-    tname: Ident,
+    ty: Type,
 }
 
 struct EnumContext {
@@ -36,12 +36,47 @@ impl From<Field> for Fd {
     }
 }
 
+use syn::Type::*;
+
+fn debug_type<'a>(t: &Type) -> &'a str {
+    match t {
+        Array(_) => "Array",
+        BareFn(_) => "BareFn",
+        Group(_) => "Group",
+        ImplTrait(_) => "ImplTrait",
+        Infer(_) => "Infer",
+        Macro(_) => "Macro",
+        Never(_) => "Never",
+        Paren(_) => "Paren",
+        Path(_) => "Path",
+        Ptr(_) => "Ptr",
+        Reference(_) => "Reference",
+        Slice(_) => "Slice",
+        TraitObject(_) => "TraitObject",
+        Tuple(_) => "Tuple",
+        Verbatim(_) => "Verbatim",
+        _ => todo!()
+        // Not public API.
+    }
+}
+
+fn get_ident (t: &Type) -> Ident {
+    match t {
+        Path(p) => p.path.get_ident().unwrap().clone(),
+        _ => todo!("not implemented")
+        // Not public API.
+    }
+}
+
+
 impl From<Variant> for Ed {
     fn from(f: Variant) -> Self {
-        println!("fields {:?}", f.fields.iter().collect::<Vec<_>>()[0].clone().ty);
+        let fields = f.fields.iter().collect::<Vec<_>>().clone();
+        let t = fields[0].clone().ty;
+        println!("tuple type is {}, fields number {}", debug_type(&t), fields.len());
         Self {
             name: f.ident,
-            tname: f.fields.iter().collect::<Vec<_>>()[0].clone().ident.expect("option none")
+            ty: t,
         }
     }
 }
@@ -123,13 +158,17 @@ impl EnumContext {
 
             impl WitnessObjReader for #name {
                 fn from_witness(&mut self, fetcher: &mut impl FnMut() -> u64,  base: *const u8) {
+                    let obj = self as *mut Self;
                     let enum_index = fetcher();
-                    let ptr = unsafe { self as *const u64 };
-                    *ptr = enum_index;
-                    let obj_ptr = ptr.add(size_of(u64));
+                    unsafe {
+                        let ptr = obj as *mut u64;
+                        *ptr = enum_index;
+                    }
+                    let obj_ptr = unsafe { obj.add(8) };
                     unsafe {
                         match enum_index {
                             #(#fields_reader)*
+                            _ => unreachable!()
                         }
                     }
                 }
@@ -140,11 +179,11 @@ impl EnumContext {
     fn witness_reader(&self) -> Vec<TokenStream2> {
         let mut ret = vec![];
         for i in 0..self.variants.len() {
-            let name = self.variants[i].name.clone();
-            let tname = self.variants[i].tname.clone();
+            let index = i as u64;
+            let ty = self.variants[i].ty.clone();
             ret.push(quote!(
-                #i => {
-                    (obj_ptr as *mut #tname).from_witness(fetcher, base);
+                #index => {
+                    (*(obj_ptr as *mut #ty)).from_witness(fetcher, base);
                 }
             ));
         }
@@ -154,10 +193,11 @@ impl EnumContext {
     fn witness_writer(&self) -> Vec<TokenStream2> {
         let mut ret = vec![];
         for i in 0..self.variants.len() {
+            let index = i as u64;
             let name = self.variants[i].name.clone();
             ret.push(quote!(
-                #name(obj) => {
-                    wasm_witness_insert(i)
+                Self::#name(obj) => {
+                    unsafe { wasm_witness_insert(#index) };
                     obj.to_witness(ori_base);
                 }
             ));

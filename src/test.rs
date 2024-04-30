@@ -322,24 +322,40 @@ mod witness_test {
         let v = unsafe { &*obj };
         super::super::dbg!("test b is {:?}\n", v);
     }
+
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    struct AA {
+        x: u64,
+    }
+
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    struct BB {
+        y: u64,
+    }
+
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    enum EA {
+       A(AA),
+       B(BB),
+    }
+
+    pub fn prepare_test_enum(a: i64) {
+        prepare_witness_obj(
+            |x: &u64| {
+                EA::B(BB {y: *x})
+            },
+            &(a as u64),
+        );
+    }
+
+    pub fn test_witness_obj_test_enum() {
+        let base_addr = alloc_witness_memory();
+        prepare_test_enum(10);
+        let obj = load_witness_obj::<EA>(|| unsafe { wasm_witness_pop() }, base_addr);
+        let v = unsafe { &*obj };
+        super::super::dbg!("test enum is {:?}\n", v);
+    }
 }
-
-use crate::witness::WitnessObjWriter;
-use crate::witness::WitnessObjReader;
-
-#[derive(WitnessObj, PartialEq, Clone, Debug)]
-struct AA {}
-
-#[derive(WitnessObj, PartialEq, Clone, Debug)]
-struct BB {}
-
-use derive_builder::WitnessObj;
-#[derive(WitnessObj, PartialEq, Clone, Debug)]
-enum EA {
-   A(AA),
-   B(BB),
-}
-
 
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
@@ -361,6 +377,7 @@ pub fn zkmain() -> i64 {
         witness_test::test_witness_indexed(0x1);
         witness_test::test_witness_indexed(0x2);
         witness_test::test_witness_indexed(0xff);
+        witness_test::test_witness_obj_test_enum();
     }
     super::dbg!("test done\n");
     0
