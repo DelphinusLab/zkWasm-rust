@@ -17,7 +17,7 @@ use crate::allocator::WITNESS_AREA_END;
 use std::mem::size_of;
 
 pub trait WitnessObjWriter {
-    fn to_witness(&self, ori_base: *const u8);
+    fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8);
 }
 
 pub trait WitnessObjReader {
@@ -25,9 +25,9 @@ pub trait WitnessObjReader {
 }
 
 impl WitnessObjWriter for u64 {
-    fn to_witness(&self, _ori_base: *const u8) {
+    fn to_witness(&self, witness_writer: &mut impl FnMut(u64), _ori_base: *const u8) {
         unsafe {
-            wasm_witness_insert(*self);
+            witness_writer(*self);
         }
     }
 }
@@ -40,16 +40,16 @@ impl WitnessObjReader for u64 {
 
 impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
     /// [ptr, len, capacity, array[0... self.len()]
-    fn to_witness(&self, ori_base: *const u8) {
+    fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
         let arr_ptr = unsafe { (c[0] as *const u8).sub_ptr(ori_base) };
         unsafe {
-            wasm_witness_insert(arr_ptr as u64);
-            wasm_witness_insert(c[1] as u64);
-            wasm_witness_insert(c[2] as u64);
+            witness_writer(arr_ptr as u64);
+            witness_writer(c[1] as u64);
+            witness_writer(c[2] as u64);
         }
         for t in self {
-            t.to_witness(ori_base);
+            t.to_witness(witness_writer, ori_base);
         }
     }
 }
@@ -80,6 +80,7 @@ impl<T: WitnessObjReader> WitnessObjReader for Vec<T> {
 }
 
 fn prepare_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
+    witness_writer: &mut impl FnMut(u64),
     mut gen: impl FnMut(&T) -> Obj,
     t: &T,
 ) -> () {
@@ -90,17 +91,18 @@ fn prepare_witness_obj_inner<Obj: Clone + WitnessObjReader + WitnessObjWriter, T
         let diff = (c.as_ref() as *const Obj as *const u8).sub_ptr(ori_base) as u64;
         require(diff == 0);
     }
-    c.to_witness(ori_base);
+    c.to_witness(witness_writer, ori_base);
 }
 
 pub fn prepare_witness_obj<Obj: Clone + WitnessObjReader + WitnessObjWriter, T>(
+    witness_writer: &mut impl FnMut(u64),
     gen: impl FnMut(&T) -> Obj,
     t: &T,
 ) -> () {
     unsafe {
         start_alloc_witness();
     }
-    prepare_witness_obj_inner(gen, t);
+    prepare_witness_obj_inner(witness_writer, gen, t);
     unsafe {
         stop_alloc_witness();
     }
