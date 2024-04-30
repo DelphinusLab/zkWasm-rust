@@ -150,6 +150,17 @@ impl EnumContext {
         quote!(
             impl WitnessObjWriter for #name {
                 fn to_witness(&self, ori_base: *const u8) {
+                    let obj = self as *const Self;
+                    unsafe {
+                        super::super::dbg!("obj is {:?}", self);
+                        let ptr = obj as *const u64;
+                        let v = *ptr;
+                        super::super::dbg!("u64 is {}", v);
+                        let ptr = ptr.add(1);
+                        let v = *(ptr as *const u64);
+                        super::super::dbg!("field is {}", v);
+                    }
+
                     match self {
                         #(#fields_writer)*
                     }
@@ -163,9 +174,7 @@ impl EnumContext {
                     unsafe {
                         let ptr = obj as *mut u64;
                         *ptr = enum_index;
-                    }
-                    let obj_ptr = unsafe { obj.add(8) };
-                    unsafe {
+                        let obj_ptr = unsafe { ptr.add(1) };
                         match enum_index {
                             #(#fields_reader)*
                             _ => unreachable!()
