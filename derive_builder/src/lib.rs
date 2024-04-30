@@ -107,7 +107,7 @@ impl StructContext {
         let fields_reader = self.witness_reader();
         quote!(
             impl WitnessObjWriter for #name {
-                fn to_witness(&self, ori_base: *const u8) {
+                fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
                     #(#fields_writer)*
                 }
             }
@@ -135,7 +135,7 @@ impl StructContext {
         let mut ret = vec![];
         for i in 0..self.fields.len() {
             let name = self.fields[i].name.clone();
-            ret.push(quote!(self.#name.to_witness(ori_base);));
+            ret.push(quote!(self.#name.to_witness(witness_writer, ori_base);));
         }
         ret
     }
@@ -149,7 +149,7 @@ impl EnumContext {
         let fields_reader = self.witness_reader();
         quote!(
             impl WitnessObjWriter for #name {
-                fn to_witness(&self, ori_base: *const u8) {
+                fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
                     let obj = self as *const Self;
                     unsafe {
                         super::super::dbg!("obj is {:?}", self);
@@ -207,7 +207,7 @@ impl EnumContext {
             ret.push(quote!(
                 Self::#name(obj) => {
                     unsafe { wasm_witness_insert(#index) };
-                    obj.to_witness(ori_base);
+                    obj.to_witness(witness_writer, ori_base);
                 }
             ));
         }

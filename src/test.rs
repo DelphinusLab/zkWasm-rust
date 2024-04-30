@@ -214,6 +214,7 @@ mod witness_test {
     #[inline(never)]
     pub fn prepare_u64_vec(a: i64) {
         prepare_witness_obj(
+            &mut |x| unsafe { wasm_witness_insert(x) },
             |x: &u64| {
                 let mut a = vec![];
                 for i in 0..2000 {
@@ -262,6 +263,7 @@ mod witness_test {
     #[inline(never)]
     pub fn prepare_test_a(a: i64) {
         prepare_witness_obj(
+            &mut |x| unsafe { wasm_witness_insert(x) },
             |x: &u64| {
                 let mut c = vec![];
                 for i in 0..10 {
@@ -291,6 +293,7 @@ mod witness_test {
     #[inline(never)]
     pub fn prepare_test_b(a: i64) {
         prepare_witness_obj(
+            &mut |x| unsafe { wasm_witness_insert(x) },
             |x: &u64| {
                 let mut c = vec![];
                 let mut a_array = vec![];
@@ -335,15 +338,14 @@ mod witness_test {
 
     #[derive(WitnessObj, PartialEq, Clone, Debug)]
     enum EA {
-       A(AA),
-       B(BB),
+        A(AA),
+        B(BB),
     }
 
     pub fn prepare_test_enum(a: i64) {
         prepare_witness_obj(
-            |x: &u64| {
-                EA::B(BB {y: *x})
-            },
+            &mut |x| unsafe { wasm_witness_insert(x) },
+            |x: &u64| EA::B(BB { y: *x }),
             &(a as u64),
         );
     }
