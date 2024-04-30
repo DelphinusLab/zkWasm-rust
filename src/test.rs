@@ -210,7 +210,12 @@ pub fn test_jubjub() {
 
 mod witness_test {
     use crate::allocator::alloc_witness_memory;
+    use crate::require;
     use crate::witness::*;
+    use crate::{
+        wasm_witness_indexed_insert, wasm_witness_indexed_pop, wasm_witness_indexed_push,
+        wasm_witness_insert, wasm_witness_pop, wasm_witness_set_index,
+    };
     #[inline(never)]
     pub fn prepare_u64_vec(a: i64) {
         prepare_witness_obj(
@@ -327,17 +332,17 @@ mod witness_test {
     }
 
     #[derive(WitnessObj, PartialEq, Clone, Debug)]
-    struct AA {
+    pub struct AA {
         x: u64,
     }
 
     #[derive(WitnessObj, PartialEq, Clone, Debug)]
-    struct BB {
+    pub struct BB {
         y: u64,
     }
 
     #[derive(WitnessObj, PartialEq, Clone, Debug)]
-    enum EA {
+    pub enum EA {
         A(AA),
         B(BB),
     }

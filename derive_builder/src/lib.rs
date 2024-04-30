@@ -36,44 +36,11 @@ impl From<Field> for Fd {
     }
 }
 
-use syn::Type::*;
-
-fn debug_type<'a>(t: &Type) -> &'a str {
-    match t {
-        Array(_) => "Array",
-        BareFn(_) => "BareFn",
-        Group(_) => "Group",
-        ImplTrait(_) => "ImplTrait",
-        Infer(_) => "Infer",
-        Macro(_) => "Macro",
-        Never(_) => "Never",
-        Paren(_) => "Paren",
-        Path(_) => "Path",
-        Ptr(_) => "Ptr",
-        Reference(_) => "Reference",
-        Slice(_) => "Slice",
-        TraitObject(_) => "TraitObject",
-        Tuple(_) => "Tuple",
-        Verbatim(_) => "Verbatim",
-        _ => todo!()
-        // Not public API.
-    }
-}
-
-fn get_ident (t: &Type) -> Ident {
-    match t {
-        Path(p) => p.path.get_ident().unwrap().clone(),
-        _ => todo!("not implemented")
-        // Not public API.
-    }
-}
-
 
 impl From<Variant> for Ed {
     fn from(f: Variant) -> Self {
         let fields = f.fields.iter().collect::<Vec<_>>().clone();
         let t = fields[0].clone().ty;
-        println!("tuple type is {}, fields number {}", debug_type(&t), fields.len());
         Self {
             name: f.ident,
             ty: t,
@@ -150,17 +117,6 @@ impl EnumContext {
         quote!(
             impl WitnessObjWriter for #name {
                 fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
-                    let obj = self as *const Self;
-                    unsafe {
-                        super::super::dbg!("obj is {:?}", self);
-                        let ptr = obj as *const u64;
-                        let v = *ptr;
-                        super::super::dbg!("u64 is {}", v);
-                        let ptr = ptr.add(1);
-                        let v = *(ptr as *const u64);
-                        super::super::dbg!("field is {}", v);
-                    }
-
                     match self {
                         #(#fields_writer)*
                     }
@@ -206,7 +162,7 @@ impl EnumContext {
             let name = self.variants[i].name.clone();
             ret.push(quote!(
                 Self::#name(obj) => {
-                    unsafe { wasm_witness_insert(#index) };
+                    unsafe { witness_writer(#index) };
                     obj.to_witness(witness_writer, ori_base);
                 }
             ));

@@ -1,19 +1,9 @@
-extern "C" {
-    /// inserts a witness at the current wasm_private inputs cursor
-    pub fn wasm_witness_insert(u: u64);
-    pub fn wasm_witness_pop() -> u64;
-    pub fn wasm_witness_set_index(x: u64);
-    pub fn wasm_witness_indexed_pop() -> u64;
-    pub fn wasm_witness_indexed_insert(x: u64);
-    pub fn wasm_witness_indexed_push(x: u64);
-    pub fn require(cond: bool);
-}
-
 use crate::allocator::get_latest_allocation_base;
 use crate::allocator::start_alloc_witness;
 use crate::allocator::stop_alloc_witness;
 use crate::allocator::WITNESS_AREA;
 use crate::allocator::WITNESS_AREA_END;
+use crate::require;
 use std::mem::size_of;
 
 pub trait WitnessObjWriter {
@@ -26,9 +16,7 @@ pub trait WitnessObjReader {
 
 impl WitnessObjWriter for u64 {
     fn to_witness(&self, witness_writer: &mut impl FnMut(u64), _ori_base: *const u8) {
-        unsafe {
-            witness_writer(*self);
-        }
+        witness_writer(*self);
     }
 }
 
@@ -43,11 +31,9 @@ impl<T: WitnessObjWriter> WitnessObjWriter for Vec<T> {
     fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
         let c: &[usize; 3] = unsafe { std::mem::transmute(self) };
         let arr_ptr = unsafe { (c[0] as *const u8).sub_ptr(ori_base) };
-        unsafe {
-            witness_writer(arr_ptr as u64);
-            witness_writer(c[1] as u64);
-            witness_writer(c[2] as u64);
-        }
+        witness_writer(arr_ptr as u64);
+        witness_writer(c[1] as u64);
+        witness_writer(c[2] as u64);
         for t in self {
             t.to_witness(witness_writer, ori_base);
         }

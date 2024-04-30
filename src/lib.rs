@@ -24,6 +24,13 @@ extern "C" {
     pub fn babyjubjub_sum_push(x: u64);
     pub fn babyjubjub_sum_finalize() -> u64;
 
+    /// inserts a witness at the current wasm_private inputs cursor
+    pub fn wasm_witness_insert(u: u64);
+    pub fn wasm_witness_pop() -> u64;
+    pub fn wasm_witness_set_index(x: u64);
+    pub fn wasm_witness_indexed_pop() -> u64;
+    pub fn wasm_witness_indexed_insert(x: u64);
+    pub fn wasm_witness_indexed_push(x: u64);
 }
 
 pub mod allocator;
