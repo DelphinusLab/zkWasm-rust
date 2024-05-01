@@ -347,7 +347,20 @@ mod witness_test {
         B(BB),
     }
 
-    pub fn prepare_test_enum(a: i64) {
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    pub struct CC {
+        x: EA,
+        y: u64,
+    }
+
+    #[derive(WitnessObj, PartialEq, Clone, Debug)]
+    pub enum EB {
+        A(AA),
+        B(BB),
+        C(CC),
+    }
+
+    pub fn prepare_test_enum_a(a: i64) {
         prepare_witness_obj(
             &mut |x| unsafe { wasm_witness_insert(x) },
             |x: &u64| EA::B(BB { y: *x }),
@@ -355,12 +368,28 @@ mod witness_test {
         );
     }
 
-    pub fn test_witness_obj_test_enum() {
+    pub fn test_witness_obj_test_enum_a() {
         let base_addr = alloc_witness_memory();
-        prepare_test_enum(10);
+        prepare_test_enum_a(10);
         let obj = load_witness_obj::<EA>(|| unsafe { wasm_witness_pop() }, base_addr);
         let v = unsafe { &*obj };
-        super::super::dbg!("test enum is {:?}\n", v);
+        super::super::dbg!("test enum_a is {:?}\n", v);
+    }
+
+    pub fn prepare_test_enum_b(a: i64) {
+        prepare_witness_obj(
+            &mut |x| unsafe { wasm_witness_insert(x) },
+            |x: &u64| EB::C(CC{ x: EA::B(BB { y: *x }), y: 255}),
+            &(a as u64),
+        );
+    }
+
+    pub fn test_witness_obj_test_enum_b() {
+        let base_addr = alloc_witness_memory();
+        prepare_test_enum_b(127);
+        let obj = load_witness_obj::<EB>(|| unsafe { wasm_witness_pop() }, base_addr);
+        let v = unsafe { &*obj };
+        super::super::dbg!("test enum_b is {:?}\n", v);
     }
 }
 
@@ -384,7 +413,8 @@ pub fn zkmain() -> i64 {
         witness_test::test_witness_indexed(0x1);
         witness_test::test_witness_indexed(0x2);
         witness_test::test_witness_indexed(0xff);
-        witness_test::test_witness_obj_test_enum();
+        witness_test::test_witness_obj_test_enum_a();
+        witness_test::test_witness_obj_test_enum_b();
     }
     super::dbg!("test done\n");
     0
