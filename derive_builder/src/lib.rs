@@ -117,6 +117,13 @@ impl EnumContext {
         quote!(
             impl WitnessObjWriter for #name {
                 fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
+                    unsafe {
+                        let obj = self as *const Self;
+                        let ptr = obj as *const u64;
+                        let v = *ptr;
+                        crate::dbg!("to witness of {:?}\n", self);
+                        crate::dbg!("discriment is {}\n", v);
+                    }
                     match self {
                         #(#fields_writer)*
                     }
@@ -127,6 +134,7 @@ impl EnumContext {
                 fn from_witness(&mut self, fetcher: &mut impl FnMut() -> u64,  base: *const u8) {
                     let obj = self as *mut Self;
                     let enum_index = fetcher();
+                    crate::dbg!("enum index is {}\n", enum_index);
                     unsafe {
                         let ptr = obj as *mut u64;
                         *ptr = enum_index;
