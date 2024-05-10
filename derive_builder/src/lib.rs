@@ -117,6 +117,18 @@ impl EnumContext {
         quote!(
             impl WitnessObjWriter for #name {
                 fn to_witness(&self, witness_writer: &mut impl FnMut(u64), ori_base: *const u8) {
+                    /* Debugging
+                    unsafe {
+                        let obj = self as *const Self;
+                        let ptr = obj as *const usize;
+                        let v = *ptr;
+                        crate::dbg!("to witness of {:?}\n", self);
+                        crate::dbg!("discriment is {}\n", v);
+
+                        let v = *(ptr.add(1));
+                        crate::dbg!("double check of {:?}\n", v);
+                    }
+                    */
                     match self {
                         #(#fields_writer)*
                     }
