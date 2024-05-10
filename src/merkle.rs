@@ -15,9 +15,6 @@ pub struct Merkle {
     pub root: [u64; 4],
 }
 
-// buf to receive max size of merkle leaf data node
-static mut DATA_NODE_BUF: [u64; 1024] = [0; 1024];
-
 impl Merkle {
     /// New Merkle with initial root hash
     /// set root with move to avoid copy
@@ -119,12 +116,13 @@ impl Merkle {
         }
     }
 
-    pub fn get(&self, index: u32, data: &mut [u64], hash: &mut [u64; 4], pad: bool) -> u64 {
-        self.get_simple(index, hash);
-        let len = cache::fetch_data(&hash, data);
-        if len > 0 {
+    pub fn get(&self, index: u32, pad: bool) -> ([u64; 4], Vec<u64>) {
+        let mut hash = [0; 4];
+        self.get_simple(index, &mut hash);
+        let data = cache::get_data(&hash);
+        if data.len() > 0 {
             // FIXME: avoid copy here
-            let hash_check = PoseidonHasher::hash(&data[0..len as usize], pad);
+            let hash_check = PoseidonHasher::hash(&data, pad);
             unsafe {
                 require(hash[0] == hash_check[0]);
                 require(hash[1] == hash_check[1]);
@@ -139,7 +137,7 @@ impl Merkle {
                 require(hash[3] == 0);
             }
         }
-        len
+        (hash, data)
     }
 
     /// safe version of set which enforces a get before set
@@ -175,46 +173,36 @@ fn data_matches_key(data: &[u64], key: &[u64]) -> bool {
 }
 
 // using a static buf to avoid memory allocation in smt implementation
-fn set_smt_data(node_buf: &mut [u64], t: u64, key: &[u64], data: &[u64]) {
-    node_buf[0] = t;
-    node_buf[1] = key[0];
-    node_buf[2] = key[1];
-    node_buf[3] = key[2];
-    node_buf[4] = key[3];
-    for i in 0..data.len() {
-        node_buf[5 + i] = data[i];
-    }
+fn set_smt_data(t: u64, key: &[u64], data: &[u64]) -> Vec<u64> {
+    let node_buf = data.clone().to_vec();
+    let buf = vec![t, key[0], key[1], key[2], key[3]];
+    [buf, node_buf].concat()
 }
 
 impl Merkle {
-    fn smt_get_local(&self, key: &[u64; 4], path_index: usize, data: &mut [u64]) -> u64 {
-        //crate::dbg!("start smt_get_local {}\n", path_index);
+    fn smt_get_local(&self, key: &[u64; 4], path_index: usize) -> Vec<u64> {
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
-        let mut hash = [0; 4];
         // pad is true since the leaf might the root of a sub merkle
-        let len = self.get(local_index, data, &mut hash, true);
-        if len == 0 {
+        let (_, data) = self.get(local_index, true);
+        if data.len() == 0 {
             // no node was find
-            return 0;
+            return vec![];
         } else {
-            //crate::dbg!("smt_get_local with data {:?}\n", data);
+            // crate::dbg!("smt_get_local with data {:?}\n", data);
             if (data[0] & 0x1) == LEAF_NODE {
-                //crate::dbg!("smt_get_local is leaf\n");
-                if data_matches_key(data, key) {
-                    for i in 0..(len - 5) {
-                        data[i as usize] = data[i as usize + 5]
-                    }
-                    return len - 5;
+                // crate::dbg!("smt_get_local is leaf\n");
+                if data_matches_key(data.as_slice(), key) {
+                    return data[5..data.len()].to_vec();
                 } else {
                     // not hit and return len = 0
-                    return 0;
+                    return vec![];
                 }
             } else {
-                //crate::dbg!("smt_get_local is node: continue in sub merkle\n");
+                // crate::dbg!("smt_get_local is node: continue in sub merkle\n");
                 unsafe { require((data[0] & 0x1) == TREE_NODE) };
                 let sub_merkle = Merkle::load(data[1..5].try_into().unwrap());
-                sub_merkle.smt_get_local(key, path_index + 1, data)
+                sub_merkle.smt_get_local(key, path_index + 1)
             }
         }
     }
@@ -222,27 +210,24 @@ impl Merkle {
     fn smt_set_local(&mut self, key: &[u64], path_index: usize, data: &[u64]) {
         unsafe { require(path_index < 8) };
         let local_index = (key[path_index / 2] >> (32 * (path_index % 2))) as u32;
-        let node_buf = unsafe { DATA_NODE_BUF.as_mut_slice() };
-        let mut hint_hash = [0; 4];
-        let len = self.get(local_index, node_buf, &mut hint_hash, true);
-        if len == 0 {
-            let data_len = data.len();
-            //crate::dbg!("smt set local not hit update data {}:\n", data_len);
-            set_smt_data(node_buf, LEAF_NODE, key, data);
+        let (_, content) = self.get(local_index, true);
+        if content.len() == 0 {
+            // let root = self.root;
+            // crate::dbg!("smt add new leaf {:?} {:?}\n", root, data);
+            let node_buf = set_smt_data(LEAF_NODE, key, data);
             unsafe {
-                self.set_unsafe(local_index, &node_buf[0..5 + data_len], true);
+                self.set_unsafe(local_index, node_buf.as_slice(), true);
             }
         } else {
             //crate::dbg!("smt set local hit:\n");
-            if (node_buf[0] & 0x1) == LEAF_NODE {
+            if (content[0] & 0x1) == LEAF_NODE {
                 //crate::dbg!("current node for set is leaf:\n");
-                if data_matches_key(node_buf, key) {
-                    let data_len = data.len();
-                    //crate::dbg!("key match update data {}:\n", data_len);
+                if data_matches_key(content.as_slice(), key) {
+                    //crate::dbg!("key match update data:\n");
                     // if hit the current node
-                    set_smt_data(node_buf, LEAF_NODE, key, data);
+                    let node_buf = set_smt_data(LEAF_NODE, key, data);
                     unsafe {
-                        self.set_unsafe(local_index, &node_buf[0..5 + data_len], true);
+                        self.set_unsafe(local_index, node_buf.as_slice(), true);
                     }
                 } else {
                     //crate::dbg!("key not match, creating sub node:\n");
@@ -250,23 +235,24 @@ impl Merkle {
                     // 1. start a new merkle sub tree
                     let mut sub_merkle = Merkle::new();
                     sub_merkle.smt_set_local(
-                        &node_buf[1..5],
+                        &content[1..5],
                         path_index + 1,
-                        &node_buf[5..len as usize],
+                        &content[5..content.len() as usize],
                     );
                     sub_merkle.smt_set_local(key, path_index + 1, data);
-                    set_smt_data(node_buf, TREE_NODE, sub_merkle.root.as_slice(), &[]);
+                    let node_buf = set_smt_data(TREE_NODE, sub_merkle.root.as_slice(), &[]);
                     // 2 update the current node with the sub merkle tree
+                    // crate::dbg!("created sub node {:?}:\n", node_buf);
                     // OPT: shoulde be able to use the hint_hash in the future
                     self.set(local_index, &node_buf[0..5], true, None);
                 }
             } else {
                 //crate::dbg!("current node for set is node:\n");
                 // the node is already a sub merkle
-                unsafe { require((node_buf[0] & 0x1) == TREE_NODE) };
-                let mut sub_merkle = Merkle::load(node_buf[1..5].try_into().unwrap());
+                unsafe { require((content[0] & 0x1) == TREE_NODE) };
+                let mut sub_merkle = Merkle::load(content[1..5].try_into().unwrap());
                 sub_merkle.smt_set_local(key, path_index + 1, data);
-                set_smt_data(node_buf, TREE_NODE, sub_merkle.root.as_slice(), &[]);
+                let node_buf = set_smt_data(TREE_NODE, sub_merkle.root.as_slice(), &[]);
                 self.set(local_index, &node_buf[0..5], true, None);
             }
         }
@@ -274,8 +260,8 @@ impl Merkle {
 }
 
 impl SMT for Merkle {
-    fn smt_get(&self, key: &[u64; 4], data: &mut [u64]) -> u64 {
-        self.smt_get_local(key, 0, data)
+    fn smt_get(&self, key: &[u64; 4]) -> Vec<u64> {
+        self.smt_get_local(key, 0)
     }
 
     fn smt_set(&mut self, key: &[u64; 4], data: &[u64]) {

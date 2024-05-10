@@ -24,27 +24,25 @@ pub fn test_merkle() {
     hasher.finalize();
 
     let mut merkle = Merkle::new();
-    let mut leaf = [0, 0, 0, 0];
 
     crate::dbg!("testing merkle set 1, index: 0\n");
     merkle.set(0, &[1, 1, 2, 2], false, None);
 
-    let len = merkle.get(0, &mut leaf, &mut [0; 4], false);
+    let (_, content) = merkle.get(0, false);
 
     unsafe {
-        require(len == 4);
-        require(leaf == [1, 1, 2, 2]);
+        require(content.len() == 4);
+        require(content.as_slice() == [1, 1, 2, 2]);
     }
 
     crate::dbg!("testing merkle set 2, index: 0\n");
     merkle.set(0, &[3, 4, 5, 6, 7], true, None);
-    let mut leaf = [0, 0, 0, 0, 0];
 
-    let len = merkle.get(0, &mut leaf, &mut [0; 4], true);
+    let (_, content) = merkle.get(0, true);
 
     unsafe {
-        require(len == 5);
-        require(leaf == [3, 4, 5, 6, 7]);
+        require(content.len() == 5);
+        require(content.as_slice() == [3, 4, 5, 6, 7]);
     }
 
     crate::dbg!("testing merkle set simple, index: 1\n");
@@ -58,17 +56,18 @@ pub fn test_merkle() {
     }
 }
 
-fn test_kvpair_value(
-    kvpair: &mut KeyValueMap<Merkle>,
-    key: &[u64; 4],
-    data_buf: &mut [u64],
-    data: &[u64],
-) {
-    let len = kvpair.get(&key, data_buf);
+fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64; 4], data: &[u64]) {
+    let content = kvpair.get(&key);
     unsafe {
-        require(len as usize == data.len());
-        for i in 0..len as usize {
-            require(data_buf[i] == data[i]);
+        let l1 = content.len();
+        let l2 = data.len();
+        crate::dbg!("check length {} {}...\n", l1, l2);
+        require(content.len() as usize == data.len());
+        for i in 0..content.len() as usize {
+            let v = content[i];
+            let r = data[i];
+            crate::dbg!("check value {} {} {} ...\n", i, v, r);
+            require(content[i] == data[i]);
         }
     }
 }
@@ -83,29 +82,31 @@ pub fn test_kvpair() {
     let key5 = [1, 5, 3, (2u64 << 32) + 5];
     let key6 = [1, 5, 4, (2u64 << 32) + 5];
 
-    let mut data_buf = [0; 16]; // indicator, 4 for key + 4 for data
-
     crate::dbg!("testing kvpair key1\n");
     kvpair.set(&key1, &[1]);
-    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
+    test_kvpair_value(&mut kvpair, &key1, &[1]);
 
     crate::dbg!("testing kvpair key2 ...\n");
     kvpair.set(&key2, &[2, 3]);
-    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
-    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
+    let root = kvpair.merkle.root;
+    crate::dbg!("root is {:?}...\n", root);
+    test_kvpair_value(&mut kvpair, &key1, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
 
     crate::dbg!("testing kvpair key3 ...\n");
     kvpair.set(&key3, &[4, 5, 6]);
-    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
-    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
-    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
+    let root = kvpair.merkle.root;
+    crate::dbg!("root is {:?}...\n", root);
+    test_kvpair_value(&mut kvpair, &key1, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
 
     crate::dbg!("testing kvpair key4 ...\n");
     kvpair.set(&key4, &[7]);
-    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[1]);
-    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
-    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
-    test_kvpair_value(&mut kvpair, &key4, &mut data_buf, &[7]);
+    test_kvpair_value(&mut kvpair, &key1, &[1]);
+    test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
+    test_kvpair_value(&mut kvpair, &key4, &[7]);
 
     crate::dbg!("testing kvpair key5 ...\n");
     kvpair.set(&key5, &[8, 9]);
@@ -114,14 +115,14 @@ pub fn test_kvpair() {
     kvpair.set(&key1, &[6]);
     let delta_size = unsafe { wasm_trace_size() - trace_size };
     crate::dbg!("delta size is {}\n", delta_size);
-    test_kvpair_value(&mut kvpair, &key1, &mut data_buf, &[6]);
-    test_kvpair_value(&mut kvpair, &key2, &mut data_buf, &[2, 3]);
-    test_kvpair_value(&mut kvpair, &key3, &mut data_buf, &[4, 5, 6]);
-    test_kvpair_value(&mut kvpair, &key4, &mut data_buf, &[7]);
-    test_kvpair_value(&mut kvpair, &key5, &mut data_buf, &[8, 9]);
+    test_kvpair_value(&mut kvpair, &key1, &[6]);
+    test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
+    test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
+    test_kvpair_value(&mut kvpair, &key4, &[7]);
+    test_kvpair_value(&mut kvpair, &key5, &[8, 9]);
 
-    let len = kvpair.get(&key6, &mut data_buf);
-    unsafe { require(len == 0) };
+    let content = kvpair.get(&key6);
+    unsafe { require(content.len() == 0) };
 }
 
 pub fn test_kvpair_u64() {
@@ -361,13 +362,31 @@ mod witness_test {
         prepare_test_enum(10);
         let obj = load_witness_obj::<EA>(|| unsafe { wasm_witness_pop() }, base_addr);
         let v = unsafe { &*obj };
-        super::super::dbg!("test enum is {:?}\n", v);
+        super::super::dbg!("test enum_a is {:?}\n", v);
     }
+
+    /*
+    pub fn prepare_test_enum_b(a: i64) {
+        prepare_witness_obj(
+            &mut |x| unsafe { wasm_witness_insert(x) },
+            |x: &u64| EB::C(CC{ x: EA::B(BB { y: *x }), y: 255}),
+            &(a as u64),
+        );
+    }
+
+    pub fn test_witness_obj_test_enum_b() {
+        let base_addr = alloc_witness_memory();
+        prepare_test_enum_b(111);
+        let obj = load_witness_obj::<EB>(|| unsafe { wasm_witness_pop() }, base_addr);
+        let v = unsafe { &*obj };
+        super::super::dbg!("test enum_b is {:?}\n", v);
+    }
+    */
 }
 
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
-    if false {
+    if true {
         crate::dbg!("testing merkle\n");
         test_merkle();
         crate::dbg!("testing jubjub\n");
