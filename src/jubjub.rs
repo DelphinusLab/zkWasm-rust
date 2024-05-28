@@ -120,7 +120,10 @@ impl JubjubSignature {
                 (&self.sig_r, &ONE.0),
                 (&NEG_BASE, &self.sig_s),
             ]);
-            require(r.x.is_zero() && r.y == ONE);
+            require(r.x.is_zero());
+            for i in 0..4 {
+                require(r.y.0[i] == ONE.0[i]);
+            }
         }
     }
 }
