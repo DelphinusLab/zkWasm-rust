@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Variant, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Ident, Type, Variant};
 
 struct Fd {
     name: Ident,
@@ -27,15 +27,13 @@ enum Context {
     E(EnumContext),
 }
 
-
 impl From<Field> for Fd {
     fn from(f: Field) -> Self {
         Self {
-            name: f.ident.unwrap()
+            name: f.ident.unwrap(),
         }
     }
 }
-
 
 impl From<Variant> for Ed {
     fn from(f: Variant) -> Self {
@@ -54,11 +52,11 @@ impl From<DeriveInput> for Context {
         match input.data {
             Data::Struct(r) => {
                 let fds = r.fields.into_iter().map(Fd::from).collect();
-                Self::S (StructContext { name, fields: fds })
+                Self::S(StructContext { name, fields: fds })
             }
             Data::Enum(r) => {
                 let variants = r.variants.into_iter().map(Ed::from).collect();
-                Self::E (EnumContext { name, variants})
+                Self::E(EnumContext { name, variants })
             }
             _ => {
                 panic!("Unsupported data type")
@@ -107,7 +105,6 @@ impl StructContext {
         ret
     }
 }
-
 
 impl EnumContext {
     pub fn witness_obj_render(&self) -> TokenStream2 {
@@ -171,13 +168,12 @@ impl EnumContext {
     }
 }
 
-
 #[proc_macro_derive(WitnessObj)]
 pub fn derive_witness_obj(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let c = Context::from(input);
     match c {
         Context::S(s) => s.witness_obj_render().into(),
-        Context::E(e) => e.witness_obj_render().into()
+        Context::E(e) => e.witness_obj_render().into(),
     }
 }
