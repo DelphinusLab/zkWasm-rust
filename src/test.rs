@@ -208,6 +208,7 @@ pub fn test_jubjub() {
     sig.verify(&pk, &[32195221423877958, 0, 0, 0]);
 }
 
+#[cfg(feature = "witness")]
 mod witness_test {
     use crate::allocator::alloc_witness_memory;
     use crate::require;
