@@ -11,10 +11,10 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-witness = []
+witness = ["derive_builder"]
 wasmbind = ["witness"]
 
 [dependencies]
-primitive-types = {version="0.12.1", default-features = false}
+primitive-types = { version = "0.12.1", default-features = false }
 wasm-bindgen = "0.2.83"
-derive_builder = { path = "./derive_builder" }
+derive_builder = { path = "./derive_builder", optional = true }

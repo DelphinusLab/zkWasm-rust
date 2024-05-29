@@ -33,13 +33,13 @@ extern "C" {
     pub fn wasm_witness_indexed_push(x: u64);
 }
 
+#[cfg(feature = "witness")]
 pub mod allocator;
 pub mod cache;
 pub mod jubjub;
 pub mod kvpair;
 pub mod merkle;
 pub mod poseidon;
-
 #[cfg(feature = "witness")]
 pub mod witness;
 
