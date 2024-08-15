@@ -49,8 +49,9 @@ pub fn get_data(hash: &[u64; 4]) -> Vec<u64> {
         let len = cache_fetch_data();
         if len > 0 {
             let mut data = Vec::with_capacity(len as usize);
-            for _ in 0..len as usize {
-                data.push(cache_fetch_data());
+            unsafe { data.set_len(len as usize) };
+            for i in 0..len as usize {
+                data[i] = cache_fetch_data();
             }
             data
         } else {
