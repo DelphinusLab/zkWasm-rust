@@ -31,6 +31,9 @@ extern "C" {
     pub fn wasm_witness_indexed_pop() -> u64;
     pub fn wasm_witness_indexed_insert(x: u64);
     pub fn wasm_witness_indexed_push(x: u64);
+
+    // helper function for analytic trace size
+    pub fn wasm_trace_size() -> u64;
 }
 
 #[cfg(feature = "witness")]
