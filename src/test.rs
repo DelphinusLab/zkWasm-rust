@@ -56,6 +56,24 @@ pub fn test_merkle() {
     }
 }
 
+pub fn test_slice() {
+    let mut merkle = Merkle::new();
+    let (_, content) = merkle.get(0, true);
+    let l = 4096;
+    for i in 0..l {
+        merkle.set_simple(1, &[4, 5, 6, 7], None);
+        let mut leaf2 = [0, 0, 0, 0];
+
+        merkle.get_simple(1, &mut leaf2);
+
+        unsafe {
+            require(leaf2 == [4, 5, 6, 7]);
+        }
+    }
+}
+
+
+
 fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64; 4], data: &[u64]) {
     let content = kvpair.get(&key);
     unsafe {
@@ -395,6 +413,8 @@ pub fn zkmain() -> i64 {
         test_kvpair();
         crate::dbg!("testing kvpair u64\n");
         test_kvpair_u64();
+        crate::dbg!("testing slice\n");
+        test_slice();
     }
     if true {
         witness_test::test_witness_obj();
