@@ -3,6 +3,12 @@ extern "C" {
     //pub fn wasm_dbg(v:u64);
     pub fn require(cond: bool);
     pub fn wasm_trace_size() -> u64;
+    pub fn wasm_input(is_public: u32) -> u64;
+    pub fn wasm_output(v: u64);
+    pub fn wasm_read_context() -> u64;
+    pub fn wasm_write_context(v: u64);
+    pub fn wasm_dbg(v: u64);
+    pub fn wasm_dbg_char(v: u64);
 }
 
 use crate::jubjub::BabyJubjubPoint;
@@ -25,7 +31,7 @@ pub fn test_merkle() {
 
     let mut merkle = Merkle::new();
 
-    crate::dbg!("testing merkle set 1, index: 0\n");
+    //crate::dbg!("testing merkle set 1, index: 0\n");
     merkle.set(0, &[1, 1, 2, 2], false, None);
 
     let (_, content) = merkle.get(0, false);
@@ -35,7 +41,7 @@ pub fn test_merkle() {
         require(content.as_slice() == [1, 1, 2, 2]);
     }
 
-    crate::dbg!("testing merkle set 2, index: 0\n");
+    //crate::dbg!("testing merkle set 2, index: 0\n");
     merkle.set(0, &[3, 4, 5, 6, 7], true, None);
 
     let (_, content) = merkle.get(0, true);
@@ -45,7 +51,7 @@ pub fn test_merkle() {
         require(content.as_slice() == [3, 4, 5, 6, 7]);
     }
 
-    crate::dbg!("testing merkle set simple, index: 1\n");
+    //crate::dbg!("testing merkle set simple, index: 1\n");
     merkle.set_simple(1, &[4, 5, 6, 7], None);
     let mut leaf2 = [0, 0, 0, 0];
 
@@ -61,12 +67,12 @@ fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64; 4], data: &[u
     unsafe {
         let l1 = content.len();
         let l2 = data.len();
-        crate::dbg!("check length {} {}...\n", l1, l2);
+        //crate::dbg!("check length {} {}...\n", l1, l2);
         require(content.len() as usize == data.len());
         for i in 0..content.len() as usize {
             let v = content[i];
             let r = data[i];
-            crate::dbg!("check value {} {} {} ...\n", i, v, r);
+            //crate::dbg!("check value {} {} {} ...\n", i, v, r);
             require(content[i] == data[i]);
         }
     }
@@ -82,39 +88,39 @@ pub fn test_kvpair() {
     let key5 = [1, 5, 3, (2u64 << 32) + 5];
     let key6 = [1, 5, 4, (2u64 << 32) + 5];
 
-    crate::dbg!("testing kvpair key1\n");
+    //crate::dbg!("testing kvpair key1\n");
     kvpair.set(&key1, &[1]);
     test_kvpair_value(&mut kvpair, &key1, &[1]);
 
-    crate::dbg!("testing kvpair key2 ...\n");
+    //crate::dbg!("testing kvpair key2 ...\n");
     kvpair.set(&key2, &[2, 3]);
     let root = kvpair.merkle.root;
-    crate::dbg!("root is {:?}...\n", root);
+    //crate::dbg!("root is {:?}...\n", root);
     test_kvpair_value(&mut kvpair, &key1, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
 
-    crate::dbg!("testing kvpair key3 ...\n");
+    //crate::dbg!("testing kvpair key3 ...\n");
     kvpair.set(&key3, &[4, 5, 6]);
     let root = kvpair.merkle.root;
-    crate::dbg!("root is {:?}...\n", root);
+    //crate::dbg!("root is {:?}...\n", root);
     test_kvpair_value(&mut kvpair, &key1, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
 
-    crate::dbg!("testing kvpair key4 ...\n");
+    //crate::dbg!("testing kvpair key4 ...\n");
     kvpair.set(&key4, &[7]);
     test_kvpair_value(&mut kvpair, &key1, &[1]);
     test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
     test_kvpair_value(&mut kvpair, &key4, &[7]);
 
-    crate::dbg!("testing kvpair key5 ...\n");
+    //crate::dbg!("testing kvpair key5 ...\n");
     kvpair.set(&key5, &[8, 9]);
     //kvpair.set(&key1, &[5]);
     let trace_size = unsafe { wasm_trace_size() };
     kvpair.set(&key1, &[6]);
     let delta_size = unsafe { wasm_trace_size() - trace_size };
-    crate::dbg!("delta size is {}\n", delta_size);
+    //crate::dbg!("delta size is {}\n", delta_size);
     test_kvpair_value(&mut kvpair, &key1, &[6]);
     test_kvpair_value(&mut kvpair, &key2, &[2, 3]);
     test_kvpair_value(&mut kvpair, &key3, &[4, 5, 6]);
@@ -136,7 +142,7 @@ pub fn test_kvpair_u64() {
             let trace_size = unsafe { wasm_trace_size() };
             kvpair.set(key, data);
             let delta_size = unsafe { wasm_trace_size() - trace_size };
-            crate::dbg!("fill size {}\n", delta_size);
+            //crate::dbg!("fill size {}\n", delta_size);
         }
     }
 
@@ -147,9 +153,9 @@ pub fn test_kvpair_u64() {
             let trace_size = unsafe { wasm_trace_size() };
             let data_in = kvpair.get(key);
             let delta_size = unsafe { wasm_trace_size() - trace_size };
-            crate::dbg!("get size is {}\n", delta_size);
+            //crate::dbg!("get size is {}\n", delta_size);
             if data != data_in {
-                crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
+                //crate::dbg!("key {} data {}, data_in {}\n", key, data, data_in);
             }
             unsafe { require(data == data_in) };
         }
@@ -384,28 +390,50 @@ mod witness_test {
     */
 }
 
+// #[wasm_bindgen]
+// pub fn zkmain() -> i64 {
+//     let cycles = unsafe {wasm_input(1)} ;
+//     for i in 0..cycles {
+//         crate::dbg!("cycle {}\n", i);
+//         if true {
+//             crate::dbg!("testing merkle\n");
+//             test_merkle();
+            
+//             crate::dbg!("testing kvpair\n");
+//             test_kvpair();
+//             crate::dbg!("testing kvpair u64\n");
+//             test_kvpair_u64();
+//         }
+//         if true {
+//             witness_test::test_witness_obj();
+//             witness_test::test_witness_obj_test_a();
+//             witness_test::test_witness_obj_test_b();
+//             witness_test::test_witness_indexed(0xff);
+//             witness_test::test_witness_indexed(0x1);
+//             witness_test::test_witness_indexed(0x2);
+//             witness_test::test_witness_indexed(0xff);
+//             witness_test::test_witness_obj_test_enum();
+//         }
+        
+//     }
+//     super::dbg!("test done\n");
+//     0
+// }
+
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
-    if true {
-        crate::dbg!("testing merkle\n");
-        test_merkle();
-        crate::dbg!("testing jubjub\n");
-        test_jubjub();
-        crate::dbg!("testing kvpair\n");
-        test_kvpair();
-        crate::dbg!("testing kvpair u64\n");
-        test_kvpair_u64();
+
+    let input_pub = unsafe { wasm_input(1) };
+    let input_priv = unsafe { wasm_input(0) };
+    let context = unsafe { wasm_read_context() };
+    super::dbg!("input_x: {}\n", input_pub);
+    super::dbg!("context: {}\n", context);
+    let output = (input_pub + context) * input_priv;
+
+    super::dbg!("output: {}\n", output);
+    unsafe {
+        wasm_write_context(output);
     }
-    if true {
-        witness_test::test_witness_obj();
-        witness_test::test_witness_obj_test_a();
-        witness_test::test_witness_obj_test_b();
-        witness_test::test_witness_indexed(0xff);
-        witness_test::test_witness_indexed(0x1);
-        witness_test::test_witness_indexed(0x2);
-        witness_test::test_witness_indexed(0xff);
-        witness_test::test_witness_obj_test_enum();
-    }
-    super::dbg!("test done\n");
+
     0
 }
