@@ -3,6 +3,8 @@ extern "C" {
     //pub fn wasm_dbg(v:u64);
     pub fn require(cond: bool);
     pub fn wasm_trace_size() -> u64;
+    pub fn wasm_input(index: u32) -> u64;
+
 }
 
 use crate::jubjub::BabyJubjubPoint;
@@ -10,6 +12,7 @@ use crate::jubjub::JubjubSignature;
 use crate::kvpair::KeyValueMap;
 use crate::kvpair::KeyValueMapU64;
 use crate::merkle::Merkle;
+use crate::merkle::merkle_getroot;
 use primitive_types::U256;
 
 use crate::poseidon::PoseidonHasher;
@@ -384,28 +387,52 @@ mod witness_test {
     */
 }
 
+pub fn set_merkle_leaf(index: u32) {
+   
+    let mut merkle = Merkle::new();
+    
+    merkle.set(index, &[1, 2, 3, 4], false, None);
+
+    let (hash, content) = merkle.get(index, false);
+
+    crate::dbg!("hash is {:?}...\n", hash);
+    crate::dbg!("content is {:?}...\n", content);
+
+    let root = merkle.root;
+    crate::dbg!("root is {:?}...\n", root);
+
+}
+
+pub fn read_merkle_leaf(index: u32) {
+    
+    let mut merkle = Merkle::load([
+        682346781077866974,
+        2352964591531621882,
+        14381146627477592611,
+        3184921250897295165
+    ]);
+    let mut leaf = [0, 0, 0, 0];
+    merkle.get_simple(index, &mut leaf);
+    crate::dbg!("leaf is {:?}...\n", leaf);
+
+    let root = merkle.root;
+
+    crate::dbg!("root is {:?}...\n", root);
+}
+
 #[wasm_bindgen]
 pub fn zkmain() -> i64 {
-    if true {
-        crate::dbg!("testing merkle\n");
-        test_merkle();
-        crate::dbg!("testing jubjub\n");
-        test_jubjub();
-        crate::dbg!("testing kvpair\n");
-        test_kvpair();
-        crate::dbg!("testing kvpair u64\n");
-        test_kvpair_u64();
+
+    let input_pub = unsafe { wasm_input(1) };
+    let input_priv = unsafe { wasm_input(0) };
+
+    if input_pub == 0 {
+        crate::dbg!("testing merkle set leaf\n");
+        set_merkle_leaf(input_priv.try_into().unwrap());
+    } else {
+        crate::dbg!("testing merkle read leaf\n");
+        read_merkle_leaf(input_priv.try_into().unwrap());
     }
-    if true {
-        witness_test::test_witness_obj();
-        witness_test::test_witness_obj_test_a();
-        witness_test::test_witness_obj_test_b();
-        witness_test::test_witness_indexed(0xff);
-        witness_test::test_witness_indexed(0x1);
-        witness_test::test_witness_indexed(0x2);
-        witness_test::test_witness_indexed(0xff);
-        witness_test::test_witness_obj_test_enum();
-    }
-    super::dbg!("test done\n");
+    
     0
 }
