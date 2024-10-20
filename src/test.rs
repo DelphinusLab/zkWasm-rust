@@ -72,8 +72,6 @@ pub fn test_slice() {
     }
 }
 
-
-
 fn test_kvpair_value(kvpair: &mut KeyValueMap<Merkle>, key: &[u64; 4], data: &[u64]) {
     let content = kvpair.get(&key);
     unsafe {
