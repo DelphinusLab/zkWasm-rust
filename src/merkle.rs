@@ -81,7 +81,7 @@ impl Merkle {
 
     /// Set the raw leaf data of a merkle subtree
     pub fn set_simple(&mut self, index: u32, data: &[u64; 4], hint: Option<&[u64; 4]>) {
-        // place a dummy get for merkle proof convension
+        // place a dummy get for merkle proof conversion
         unsafe {
             merkle_address(index as u64);
             merkle_setroot(self.root[0]);
