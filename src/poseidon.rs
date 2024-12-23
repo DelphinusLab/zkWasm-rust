@@ -17,7 +17,6 @@ impl PoseidonHasher {
             let group = data.len() / 3;
             let mut j = 0;
             for i in 0..group {
-                j = i * 3;
                 hasher.update(data[j]);
                 hasher.update(data[j + 1]);
                 hasher.update(data[j + 2]);
