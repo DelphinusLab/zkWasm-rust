@@ -46,6 +46,9 @@ pub mod poseidon;
 #[cfg(feature = "witness")]
 pub mod witness;
 
+#[cfg(feature = "witness")]
+pub use derive_builder::*;
+
 pub use jubjub::*;
 pub use merkle::*;
 pub use poseidon::*;
