@@ -42,6 +42,7 @@ pub mod witness;
 pub use jubjub::*;
 pub use merkle::*;
 pub use poseidon::*;
+pub use keccak::*;
 
 #[cfg(feature = "witness")]
 pub use witness::*;

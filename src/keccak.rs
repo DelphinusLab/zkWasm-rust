@@ -26,9 +26,8 @@ impl KeccakHasher {
         r
     }
 
-    pub unsafe fn native_keccak256(bytes: *const u8, len: usize) -> [u64; 4] {
+    pub fn native_keccak256(input: &[u8], len: usize) -> [u64; 4] {
         let mut hasher = Self::new();
-        let input = core::slice::from_raw_parts(bytes, len);
         // ===============================
         // 1. absorb  136-bytes =17-u64 block
         // ===============================
@@ -63,7 +62,7 @@ impl KeccakHasher {
             keccak_push(v);
         }
         self.0 += 1;
-        if self.0 == 16 {
+        if self.0 == 17 {
             unsafe {
                 keccak_finalize();
                 keccak_finalize();
