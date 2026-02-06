@@ -28,6 +28,9 @@ extern "C" {
     pub fn babyjubjub_sum_new(x: u64);
     pub fn babyjubjub_sum_push(x: u64);
     pub fn babyjubjub_sum_finalize() -> u64;
+    pub fn ecrecover_new(x: u64);
+    pub fn ecrecover_push(x: u64);
+    pub fn ecrecover_finalize() -> u64;
 
 }
 
@@ -35,6 +38,7 @@ pub mod jubjub;
 pub mod merkle;
 pub mod poseidon;
 pub mod keccak;
+pub mod ecrecover;
 
 #[cfg(feature = "witness")]
 pub mod witness;
