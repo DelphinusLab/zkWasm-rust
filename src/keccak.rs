@@ -26,7 +26,7 @@ impl KeccakHasher {
         r
     }
 
-    pub fn native_keccak256(input: &[u8], len: usize) -> [u64; 4] {
+    pub fn keccak256(input: &[u8], len: usize) -> [u64; 4] {
         let mut hasher = Self::new();
         // ===============================
         // 1. absorb  136-bytes =17-u64 block
@@ -92,33 +92,4 @@ impl KeccakHasher {
             ]
         }
     }
-
-    // pub fn finalize(&mut self) -> [u64; 4] {
-    //     let starting_one_lane = 1u64;
-    //     let ending_one_lane = 1u64 << 63;
-    //     let one_zero_one_lane = starting_one_lane + ending_one_lane;
-    //     if self.0 == 16 {
-    //         unsafe {
-    //             keccak_push(one_zero_one_lane);
-    //             keccak_new(0u64);
-    //         }
-    //     } else if self.0 < 16 {
-    //         unsafe {
-    //             keccak_push(starting_one_lane);
-    //             for k in (self.0+1) .. 16 {
-    //                 crate::wasm_dbg(k);
-    //                 keccak_push(0);
-    //             }
-    //             keccak_push(ending_one_lane);
-    //         }
-    //     }
-    //     unsafe {
-    //         [
-    //             keccak_finalize(),
-    //             keccak_finalize(),
-    //             keccak_finalize(),
-    //             keccak_finalize(),
-    //         ]
-    //     }
-    // }
 }
